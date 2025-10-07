@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from models import User
-from schemas import UserCreate
+from models.models import User
+from schemas.user_schemas import UserCreate
 from passlib.hash import bcrypt
 
 def create_user(db: Session, user: UserCreate):
