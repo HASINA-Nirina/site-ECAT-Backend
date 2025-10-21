@@ -1,0 +1,30 @@
+# Framework web
+fastapi==0.115.0
+
+# Serveur ASGI (pour lancer FastAPI)
+uvicorn==0.30.3
+
+# ORM pour gérer la base de données
+SQLAlchemy==2.0.30
+
+# Connecteur PostgreSQL
+psycopg2-binary==2.9.9
+
+# Outil de validation des données (pour les schémas)
+pydantic==2.8.2
+pydantic-settings==2.5.2
+
+# Pour les migrations de base de données (facultatif, mais pro)
+alembic==1.13.1
+
+# Sécurité (hashage des mots de passe)
+passlib[bcrypt]==1.7.4
+
+# Variables d’environnement (.env)
+python-dotenv==1.0.1
+
+psycopg2-binary==2.9.9
+passlib[bcrypt]==1.7.4
+
+pydantic[email]==2.8.2
+
