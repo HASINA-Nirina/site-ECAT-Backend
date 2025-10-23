@@ -3,6 +3,7 @@ from routers import auth
 from Core.database import engine,Base
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
+from fastapi.staticfiles import StaticFiles
 
 #CREE LES TABLES
 Base.metadata.create_all(bind=engine)
@@ -38,4 +39,6 @@ def test_db():
 
 app.include_router(auth.router)
 
+# Pour servir les images uploadées
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

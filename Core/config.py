@@ -16,3 +16,7 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
 settings = Settings()  # note le nom en minuscule pour éviter le conflit
+
+SECRET_KEY = "ECAT_SECRET_KEY_2025"
+ALGORITHM = "HS256"
+
