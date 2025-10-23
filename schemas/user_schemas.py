@@ -19,3 +19,9 @@ class UserRead(UserCreate):
 
     class config:
         orm_mode = True
+
+class UserRead(UserCreate):
+    id: int
+
+    class config:
+        orm_mode = True
