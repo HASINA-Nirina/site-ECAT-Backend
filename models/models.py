@@ -26,3 +26,5 @@ class PendingUser(Base):
     role = Column(String, nullable=False)
     province = Column(String, nullable=True)
     statut = Column(String, default="en attente", nullable=False)
+
+  

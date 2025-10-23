@@ -9,6 +9,7 @@ from Core.config import SECRET_KEY, ALGORITHM
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
 UPLOAD_DIR = "uploads/profils"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -142,28 +143,5 @@ def register_admin_local(data: UserCreate, db: Session = Depends(get_db)):
     return {"message": "Votre demande d’inscription est en attente de validation."}
 
 
-
-@router.put("/valider_admin_local/{pending_id}")
-def valider_admin_local(pending_id: int, db: Session = Depends(get_db)):
-    pending_user = db.query(PendingUser).filter(PendingUser.id == pending_id).first()
-    if not pending_user:
-        raise HTTPException(status_code=404, detail="Demande introuvable")
-
-    # On le transfère dans la table principale
-    user_data = User(
-        nom=pending_user.nom,
-        prenom=pending_user.prenom,
-        email=pending_user.email,
-        mot_de_passe=pending_user.mot_de_passe,
-        province=pending_user.province,
-        role=pending_user.role,
-        statuts="Actif"  # ✅ devient actif
-    )
-
-    db.add(user_data)
-    db.delete(pending_user)
-    db.commit()
-
-    return {"message": f"Le compte de {pending_user.prenom} {pending_user.nom} est maintenant actif."}
 
 
