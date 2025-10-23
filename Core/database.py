@@ -1,25 +1,17 @@
-# backend/database.py
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from Core.config import Settings
-from passlib.hash import bcrypt
+from Core.config import settings
 
-SQLALCHEMY_DATABASE_URL = Settings.DATABASE_URL
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL,pool_pre_ping=True)
-engine.dispose()
-# Créer une session
+engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base déclarative pour les modèles
 Base = declarative_base()
 
 def get_db():
     db = SessionLocal()
     try:
         yield db
-    finally :
+    finally:
         db.close()
-
