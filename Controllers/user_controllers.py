@@ -14,9 +14,20 @@ ALGORITHM = "HS256"
 
 
 def create_user(db: Session, user: UserCreate):
-    # Limiter à 72 caractères et encoder en bytes pour bcrypt
+    """
+    Crée un utilisateur dans la table `user`.
+    Pour Admin Local, le statut sera 'en attente'.
+    """
     pwd_bytes = user.mot_de_passe[:72].encode('utf-8')
     hashed_password = bcrypt.hash(pwd_bytes)
+
+    # Déterminer le statut selon le rôle
+    if user.role.lower() == "Admin Local":
+        statut_initial = "en attente"
+    elif user.role.lower() in ["etudiante", "admin"]:
+        statut_initial = "Actif"
+    else:
+        statut_initial = "en attente"
 
     db_user = User(
         nom=user.nom,
@@ -25,13 +36,14 @@ def create_user(db: Session, user: UserCreate):
         mot_de_passe=hashed_password,
         province=user.province,
         role=user.role,
-        status=user.status,
+        statuts=statut_initial
     )
 
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
+
 
 
 
@@ -55,8 +67,8 @@ def authenticate_user_role(email: str, password: str, db: Session):
 
     # Vérifier le statut (attention : nom de colonne = statuts dans ta DB)
     user_statut = getattr(user, "statuts", None)  # safe : si colonne s'appelle différemment, renvoie None
-    if user_statut == "En attente":
-        return {"error": True, "message": "Votre compte est en attente de validation. Veuillez contacter l'administrateur.", "statuts": "En attente"}
+    if user_statut == "en attente":
+        return {"error": True, "message": "Votre compte est en attente de validation. Veuillez contacter l'administrateur.", "statuts": "en attente"}
 
     if user_statut != "Actif":
         # autre statut non autorisé
@@ -80,6 +92,9 @@ def authenticate_user_role(email: str, password: str, db: Session):
     }
 
 def create_pending_user(db: Session, user: UserCreate):
+    """
+    Crée un compte en attente de validation (Admin Local)
+    """
     existing_pending = db.query(PendingUser).filter(PendingUser.email == user.email).first()
     existing_user = db.query(User).filter(User.email == user.email).first()
 
@@ -96,7 +111,7 @@ def create_pending_user(db: Session, user: UserCreate):
         mot_de_passe=hashed_password,
         province=user.province,
         role=user.role,
-        statut="En attente"
+        statut="en attente"
     )
 
     db.add(pending_user)

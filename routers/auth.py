@@ -14,13 +14,15 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 @router.post("/Etudiantregister")
-def register(data: UserCreate, db: Session = Depends(get_db)):
+def register_etudiant(data: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == data.email).first()
     if existing_user:
         return {"error": "Cet e-mail est déjà utilisé."}
 
+    # Création directe et active
     db_user = create_user(db, data)
-    return {"message": "Utilisateur créé avec succès", "user": db_user.email}
+    return {"message": "Compte étudiant créé avec succès", "user": db_user.email}
+
 
 
 @router.post("/login")
@@ -71,7 +73,6 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-
 @router.put("/me/update")
 async def update_profile(
     request: Request,
@@ -96,36 +97,73 @@ async def update_profile(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
 
+    update_data = {}
     if prenom:
-        user.prenom = prenom
+        update_data["prenom"] = prenom
     if nom:
-        user.nom = nom
-
+        update_data["nom"] = nom
     if file:
         filename = f"user_{user.id}_{file.filename}"
         filepath = os.path.join(UPLOAD_DIR, filename)
         with open(filepath, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        user.image = f"/{filepath}"
+        update_data["image"] = f"/uploads/profils/{filename}"  # Chemin correct pour fetch frontend
 
-    db.commit()
-    db.refresh(user)
+    if update_data:
+        # Met à jour directement dans la DB
+        db.query(User).filter(User.id == user.id).update(update_data)
+        db.commit()
 
-    image_url = f"http://localhost:8000{user.image}" if user.image else None
+    # Récupérer les infos à jour
+    updated_user = db.query(User).filter(User.id == user.id).first()
+    image_url = f"http://localhost:8000{updated_user.image}" if updated_user.image else None
 
     return {
         "message": "Profil mis à jour avec succès",
         "user": {
-            "prenom": user.prenom,
-            "nom": user.nom,
+            "prenom": updated_user.prenom,
+            "nom": updated_user.nom,
             "image": image_url,
-            "email": user.email,
+            "email": updated_user.email,
         },
     }
 
+
 @router.post("/AdminLocalRegister")
 def register_admin_local(data: UserCreate, db: Session = Depends(get_db)):
-    result = create_pending_user(db, data)
-    if "error" in result:
-        return {"error": result["error"]}
+    # Vérifier si l'email existe déjà
+    existing_user = db.query(User).filter(User.email == data.email).first()
+    if existing_user:
+        return {"error": "Cet e-mail est déjà utilisé."}
+
+    # Créer directement dans la table `user`
+    new_user = create_user(db, data)
+
     return {"message": "Votre demande d’inscription est en attente de validation."}
+
+
+
+@router.put("/valider_admin_local/{pending_id}")
+def valider_admin_local(pending_id: int, db: Session = Depends(get_db)):
+    pending_user = db.query(PendingUser).filter(PendingUser.id == pending_id).first()
+    if not pending_user:
+        raise HTTPException(status_code=404, detail="Demande introuvable")
+
+    # On le transfère dans la table principale
+    user_data = User(
+        nom=pending_user.nom,
+        prenom=pending_user.prenom,
+        email=pending_user.email,
+        mot_de_passe=pending_user.mot_de_passe,
+        province=pending_user.province,
+        role=pending_user.role,
+        statuts="Actif"  # ✅ devient actif
+    )
+
+    db.add(user_data)
+    db.delete(pending_user)
+    db.commit()
+
+    return {"message": f"Le compte de {pending_user.prenom} {pending_user.nom} est maintenant actif."}
+
+

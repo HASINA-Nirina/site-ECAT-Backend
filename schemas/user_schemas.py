@@ -7,6 +7,8 @@ class UserCreate(BaseModel):
     mot_de_passe: str
     province: str | None = None
     role: str
+    province: str
+    statut: str = "En attente"
 
 class UserLogin(BaseModel):
     email: EmailStr

@@ -25,4 +25,4 @@ class PendingUser(Base):
     mot_de_passe = Column(String, nullable=False)
     role = Column(String, nullable=False)
     province = Column(String, nullable=True)
-    statut = Column(String, default="En attente", nullable=False)
+    statut = Column(String, default="en attente", nullable=False)
