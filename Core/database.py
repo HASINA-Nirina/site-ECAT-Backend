@@ -3,9 +3,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from Core.config import Settings
+from passlib.hash import bcrypt
 
 SQLALCHEMY_DATABASE_URL = Settings.DATABASE_URL
-# Créer l'engine SQLAlchemy
+
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL,pool_pre_ping=True)
 engine.dispose()
@@ -21,3 +22,4 @@ def get_db():
         yield db
     finally :
         db.close()
+
