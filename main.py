@@ -2,32 +2,35 @@ import sys, os
 sys.path.append(os.path.dirname(__file__))
 
 from fastapi import FastAPI
-from routers import auth
-from Core.database import engine,Base
+from routers import auth, formation, paiement, livre, forum
+from Core.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
-from Core import database
 from sqlalchemy.orm import Session
 from Core.database import SessionLocal
-from models.models import User
-import bcrypt
+from models.models import User,Sujet
+from Core.security import hash_password
+from fastapi.staticfiles import StaticFiles
 
-   
 
-import psycopg2
 
-#CREE LES TABLES
-database.Base.metadata.create_all(bind=database.engine)
 
+
+
+
+Base.metadata.create_all(bind=engine)
+       
 
 async def lifespan(app: FastAPI):
-    database.Base.metadata.create_all(bind=database.engine)
-    db: Session = SessionLocal()
-    admin_email = "admin@ecat.mg"
+    Base.metadata.create_all(bind=engine)
 
-    admin = db.query(User).filter(User.email == admin_email).first()
-    if not admin:
-        hashed_pw = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        admin_user = User(
+    db: Session = SessionLocal()
+    try:
+        # Création de l'admin si nécessaire
+        admin_email = "admin@ecat.mg"
+        admin = db.query(User).filter(User.email == admin_email).first()
+        if not admin:
+            hashed_pw = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            admin_user = User(
             nom="Admin",
             prenom="Principal",
             email=admin_email,
@@ -35,28 +38,43 @@ async def lifespan(app: FastAPI):
             role="admin",
             province=None,
             status="actif"
-        )
-        db.add(admin_user)
-        db.commit()
-        print("✅ Admin créé")
-    else:
-        print("ℹ️ Admin existe déjà")
-    db.close()
+            )
+            db.add(admin_user)
+            db.commit()
+            print("✅ etudiant créé")
 
-    print("✅ Admin initialisé")
-    yield
-    print("🛑 Fermeture de l'application")
+        # Création du sujet Administratif si nécessaire
+        admin_sujet = db.query(Sujet).filter(Sujet.titre == "Administratif").first()
+        if not admin_sujet:
+            admin_sujet = Sujet(
+                titre="Administratif",
+                idCreateur=1  
+            )
+            db.add(admin_sujet)
+            db.commit()  
+            db.refresh(admin_sujet)
+            print("✅ Sujet Admin créé")
+        
+        yield
+
+    finally:
+        db.close()
+
 
 app = FastAPI(lifespan=lifespan)
-
-
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 origins = ["*"]
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins = origins,
-    allow_credentials=True ,
-    allow_methods= ["*"],
-    allow_headers= ["*"],
- )
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(auth.router)
+app.include_router(formation.router)
+app.include_router(paiement.router)
+app.include_router(livre.router)
+app.include_router(forum.router)

@@ -1,43 +1,45 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from models.models import OTP
-from Core.config import Settings
+from Core.config import settings
 import random, smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
+from fastapi_mail import FastMail, MessageSchema
+from Core.config import settings
+from models.models import OTP
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+import random
 
-def generate_otp():
-    return str(random.randint(100000, 999999))
-
-def send_email(receiver, subject, message):
+conf = settings.MAIL_CONFIG
+async def sendOtp(email: str, db: Session):
     try:
-        with smtplib.SMTP(Settings.SMTP_SERVER, Settings.SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(Settings.EMAIL_SENDER, Settings.EMAIL_PASSWORD)
-            msg = MIMEText(message)
-            msg["Subject"] = subject
-            msg["From"] = Settings.EMAIL_SENDER
-            msg["To"] = receiver
-            server.sendmail(Settings.EMAIL_SENDER, receiver, msg.as_string())
+        code = str(random.randint(100000, 999999))
+        expires_at = datetime.now() + timedelta(minutes=5)
 
-    except smtplib.SMTPAuthenticationError as e:
-            print("Erreur d'authentification SMTP:", e.smtp_code, e.smtp_error)
-            raise HTTPException(status_code=500, detail="Erreur d’authentification SMTP")
+        otp = OTP(email=email, code=code, expires_at=expires_at)
+        db.add(otp)
+        db.commit()
+
+        message = MessageSchema(
+            subject="Votre code de vérification",
+            recipients=[email],
+            body=f"Bonjour,\n\nVoici votre code de vérification : {code}\nIl expire dans 5 minutes.",
+            subtype="plain",
+        )
+
+        fm = FastMail(conf)
+        await fm.send_message(message)
+
+        return {"message": "OTP envoyé avec succès"}
     except Exception as e:
-         print("Erreur SMTP:", e)
-         raise HTTPException(status_code=500, detail="Erreur d’envoi d’e-mail")
+        print("Erreur d’envoi OTP :", repr(e))
+        return {"detail": "Erreur d’envoi d’e-mail"}
 
-def  sendOtp(email: str, db: Session):
-    code = generate_otp()
-    otp = OTP(email=email, code=code)
-    db.add(otp)
-    db.commit()
-    send_email(email, "Votre code OTP", f"Votre code est {code} (valide 5 min)")
-    return {"message": "OTP envoyé avec succès."}
 
 def verify_otp(email: str, code: str, db: Session):
-    otp = db.query(OTP).filter(OTP.email == email, OTP.code == code).first()
+    otp = db.query(OTP).filter(OTP.email == email,OTP.code == code).first()
     
     if not otp:
         return {"success": False, "message": "Code invalide"}
