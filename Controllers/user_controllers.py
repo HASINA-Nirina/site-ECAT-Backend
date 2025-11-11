@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
-from models.models import User, PendingUser, UserLivreAccess
+from models.models import User, PendingUser, UserLivreAccess, Antenne
 from schemas.user_schemas import UserCreate,UserReadLocal,EtudiantOut
 from typing import List
+from sqlalchemy import or_
 import bcrypt
 from passlib.hash import bcrypt
 from fastapi import HTTPException,Depends
@@ -65,7 +66,17 @@ def get_user_by_email(email: str, db: Session):
     return db.query(User).filter(User.email == email).first()
 
 def get_all_etudiant(db: Session):
-    return db.query(User).filter(User.role == "etudiant").all()
+    etudiants = db.query(User).filter(User.role == "etudiante").all()
+    results = []
+    for e in etudiants:
+        results.append({
+            "id": e.id,
+            "nom": e.nom,
+            "prenom": e.prenom,
+            "email": e.email,
+            "province": getattr(e, "province", ""),
+        })
+    return results
  
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -157,10 +168,10 @@ def authenticate_user_role(email: str, password: str, db: Session):
     # Vérifier le mot de passe
     #pwd_bytes = password[:72].encode('utf-8')
     try:
-       # password_ok = bcrypt.verify(pwd_bytes, user.mot_de_passe)
-       password_ok=hash_password(user.mot_de_passe)
+        # Vérifier le mot de passe en comparant le mot de passe fourni (plain) avec le hash stocké
+        password_ok = verify_password(password, user.mot_de_passe)
     except Exception:
-        # en cas d'erreur de vérification
+        # en cas d'erreur de vérification (ex: hash corrompu)
         return {"error": True, "message": "Email ou mot de passe invalide"}
 
     if not password_ok:
@@ -246,7 +257,79 @@ def update_admin_status(db: Session, admin_id: int, new_status: str):
     db.commit()
     db.refresh(admin)
     return admin
+
+
+def sync_and_get_antennes(db: Session):
+    """Synchronize Antenne table from distinct User.province values and return list of antennes."""
+    rows = db.query(User.province).filter(User.province != None).distinct().all()
+    # rows are tuples like [(province,), ...]
+    provinces = [ (r[0] or "").strip().replace("\u00A0", " ") for r in rows ]
+
+    # normalize simple variants: collapse spaces
+    def normalize(s: str) -> str:
+        return " ".join(s.split()).strip()
+
+    normalized = [normalize(p) for p in provinces if p]
+
+    created = False
+    for p in normalized:
+        if not db.query(Antenne).filter(Antenne.province == p).first():
+            a = Antenne(province=p)
+            db.add(a)
+            created = True
+
+    if created:
+        db.commit()
+
+    antennes = db.query(Antenne).filter(Antenne.actif == True).all()
+    # return simple list of dicts
+    return [ {"id": a.id, "province": a.province, "description": a.description, "actif": a.actif} for a in antennes ]
        
+
+def get_stats_by_antenne(db: Session):
+    """
+    Retourne des statistiques agrégées par antenne.
+    Format renvoyé : [{"antenne": str, "students": int, "admins": int}, ...]
+
+    La fonction utilise la table `Antenne` si elle contient des lignes ; sinon elle dérive la liste
+    des antennes depuis les valeurs distinctes dans `user.province`.
+    Elle tente également de prendre en compte la colonne `user.antenne_id` si elle existe, pour
+    faire des correspondances plus robustes.
+    """
+    # essayer de lire les antennes canonique
+    antennes_rows = db.query(Antenne).all()
+
+    provinces = []
+    if antennes_rows:
+        provinces = [{"id": a.id, "province": a.province} for a in antennes_rows]
+    else:
+        rows = db.query(User.province).filter(User.province != None).distinct().all()
+        provinces = [{"id": None, "province": (r[0] or "").strip()} for r in rows if r[0]]
+
+    results = []
+    # Détecter si la colonne antenne_id existe sur le modèle User
+    has_antenne_id = hasattr(User, "antenne_id")
+
+    for p in provinces:
+        prov_text = p["province"]
+        if p.get("id") is not None and has_antenne_id:
+            # compter students/admins soit via antenne_id soit via province (tolérance)
+            students_count = db.query(User).filter(User.role == "etudiante").filter(
+                or_(User.antenne_id == p["id"], User.province == prov_text)
+            ).count()
+            admins_count = db.query(User).filter(User.role == "Admin Local").filter(
+                or_(User.antenne_id == p["id"], User.province == prov_text)
+            ).count()
+        else:
+            students_count = db.query(User).filter(User.role == "etudiante", User.province == prov_text).count()
+            admins_count = db.query(User).filter(User.role == "Admin Local", User.province == prov_text).count()
+
+        results.append({"antenne": prov_text, "students": students_count, "admins": admins_count})
+
+    # trier par nombre d'étudiants décroissant
+    results.sort(key=lambda x: x["students"], reverse=True)
+    return results
+
 
 
 

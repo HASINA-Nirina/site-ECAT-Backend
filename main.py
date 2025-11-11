@@ -11,12 +11,6 @@ from models.models import User,Sujet
 from Core.security import hash_password
 from fastapi.staticfiles import StaticFiles
 
-
-
-
-
-
-
 Base.metadata.create_all(bind=engine)
        
 
@@ -29,7 +23,7 @@ async def lifespan(app: FastAPI):
         admin_email = "admin@ecat.mg"
         admin = db.query(User).filter(User.email == admin_email).first()
         if not admin:
-            hashed_pw = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            hashed_pw = hash_password("admin123")
             admin_user = User(
             nom="Admin",
             prenom="Principal",
@@ -37,7 +31,7 @@ async def lifespan(app: FastAPI):
             mot_de_passe=hashed_pw,
             role="admin",
             province=None,
-            status="actif"
+            statuts="actif"
             )
             db.add(admin_user)
             db.commit()

@@ -11,7 +11,7 @@ class UserCreate(BaseModel):
     province: str | None = None
     role: str
     province: str
-    statut: str = "En attente"
+    statuts: str = "En attente"
     
 class AdminUpdateStatus(BaseModel):
     statuts: str
@@ -37,10 +37,14 @@ class UserResponse(BaseModel):
     email: str
     province: str
 class EtudiantResponse(BaseModel):
+    id: int
     nom: str
     prenom: str
     email: EmailStr
     province: str
+
+    class Config:
+        orm_mode = True
 
 class UserLogin(BaseModel):
     email: EmailStr

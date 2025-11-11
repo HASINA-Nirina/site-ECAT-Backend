@@ -1,11 +1,11 @@
 from sqlalchemy import Column, Integer, String
 from Core.database import Base
-from Core.database import Base
 from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey ,Enum ,Boolean
 from schemas.user_schemas import PaymentStatus
 from datetime import datetime, timedelta
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
+from Core.security import hash_password 
 
 class User(Base):
     __tablename__ = "user"
@@ -17,10 +17,12 @@ class User(Base):
     mot_de_passe = Column(String, nullable=False)
     role = Column(String, nullable=False)
     province = Column(String, nullable=True)
+    antenne_id = Column(Integer, ForeignKey("antenne.id"), nullable=True)
     image = Column(String, nullable=True)
     statuts = Column(String, nullable=False)
 
     paiements = relationship("Paiement", back_populates="utilisateur")
+    antenne = relationship("Antenne", back_populates="users")
 
 class PendingUser(Base):
     __tablename__ = "pending_users"
@@ -33,6 +35,19 @@ class PendingUser(Base):
     role = Column(String, nullable=False)
     province = Column(String, nullable=True)
     statut = Column(String, default="en attente", nullable=False)
+
+
+class Antenne(Base):
+    __tablename__ = "antenne"
+
+    id = Column(Integer, primary_key=True, index=True)
+    province = Column(String, unique=True, nullable=False)
+
+    def __repr__(self):
+        return f"<Antenne id={self.id} province={self.province}>"
+
+    # relation to users
+    users = relationship("User", back_populates="antenne")
 
 class OTP(Base):
     __tablename__ = "otps"

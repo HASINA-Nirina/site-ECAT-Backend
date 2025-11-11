@@ -3,7 +3,22 @@ from sqlalchemy.orm import Session
 from Core.database import get_db
 from schemas.user_schemas import Province,AdminUpdateStatus, UserCreate,EtudiantOut, UserResponse,UserLogin,EmailRequest,VerifyOTPRequest,ChangePassword,EtudiantResponse,UserReadLocal,UserUpdate,PasswordVerify,UserLivreAccessCheck
 from models.models import User,Sujet
-from Controllers.user_controllers import get_etudiants, get_all_admins_locaux,update_admin_status, get_etudiants_by_province,get_current_user,create_user, get_user_by_email,authenticate_user_role, modif_password ,get_all_etudiant ,update_user,verify_user_password
+from Controllers.user_controllers import (
+    get_etudiants,
+    get_all_admins_locaux,
+    update_admin_status,
+    get_etudiants_by_province,
+    get_current_user,
+    create_user,
+    get_user_by_email,
+    authenticate_user_role,
+    modif_password,
+    get_all_etudiant,
+    update_user,
+    verify_user_password,
+    sync_and_get_antennes,
+    get_stats_by_antenne,
+)
 from Controllers.Otp_controlllers import sendOtp,verify_otp
 import jwt, os, shutil
 from Core.security import hash_password
@@ -19,6 +34,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 UPLOAD_DIR = "uploads/profils"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+
+@router.get("/GetStatsByAntenne")
+def stats_by_antenne(db: Session = Depends(get_db)):
+    try:
+        data = get_stats_by_antenne(db)
+        return data
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Erreur lors du calcul des stats")
 
 @router.get("/GetAdminLocaux")
 def list_admins_locaux(db: Session = Depends(get_db)):
@@ -47,6 +72,21 @@ def read_etudiants(province: str, db: Session = Depends(get_db)):
 @router.get("/ReadEtudiantAll", response_model=list[EtudiantResponse])
 def read_etudiant(db: Session = Depends(get_db)):
     return get_all_etudiant(db)
+
+@router.get("/antennes")
+def read_antennes(db: Session = Depends(get_db)):
+    """Retourne la liste des antennes (synchronise depuis les users si nécessaire)."""
+    return sync_and_get_antennes(db)
+
+
+@router.get("/GetStatsByAntenne")
+def get_stats_by_antenne_route(db: Session = Depends(get_db)):
+    """Retourne les statistiques agrégées par antenne : students et admins.
+
+    Cette route appelle `get_stats_by_antenne` dans les controllers et renvoie
+    la liste [{antenne, students, admins}, ...].
+    """
+    return get_stats_by_antenne(db)
 
 @router.post("/Etudiantregister")
 def register_etudiant(data: UserCreate, db: Session = Depends(get_db)):
@@ -208,10 +248,10 @@ def check_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)):
 
 @router.post("/modifPassword")
 def modif_password_endpoint(data: ChangePassword, db: Session = Depends(get_db)):
-    print(f"Données reçues : email={data.email}, mot_de_passe={data.mot_de_passe}")
-    
+    # ChangePassword attendu : { id: int, mot_de_passe: str }
+    print(f"Données reçues : id={data.id}, mot_de_passe=***")
     try:
-        success = modif_password(data.email, data.mot_de_passe, db)
+        success = modif_password(user_id=data.id, mot_de_passe=data.mot_de_passe, db=db)
         return {"success": True, "message": "Mot de passe modifié avec succès !"}
     except Exception as e:
         print("Erreur :", e)
@@ -227,7 +267,8 @@ def modif_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):
 
 @router.post("/verifyPassword")
 def verify_password_endpoint(data: PasswordVerify, db: Session = Depends(get_db)):
-    user = verify_user_password(db, data.email, data.mot_de_passe)
+    # Attendu: body { id: int, mot_de_passe: str }
+    user = verify_user_password(db, user_id=data.id, plain_password=data.mot_de_passe)
     if not user:
         raise HTTPException(status_code=401, detail="Mot de passe incorrect ou utilisateur introuvable")
     return {"message": "Mot de passe correct"}
@@ -242,11 +283,58 @@ def verify_password_endpoint(data: PasswordVerify, db: Session = Depends(get_db)
         raise HTTPException(status_code=401, detail="Mot de passe incorrect")
     return {"message": "Mot de passe correct"}
 
-@router.post("/newPassword")
-def update_password_endpoint(data: ChangePassword, db: Session = Depends(get_db)):
-    print(data)
-    try:
-        modif_password(user_id=data.id, mot_de_passe=data.mot_de_passe, db=db)
-        return {"success": True, "message": "Mot de passe modifié avec succès !"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+@router.post("/verifyPassword")
+async def verify_password_endpoint(request: Request, db: Session = Depends(get_db)):
+    """Vérifie le mot de passe. Accepte soit {id, mot_de_passe} soit {email, mot_de_passe}.
+
+    Retourne 400 si le body est invalide, 401 si la vérification échoue.
+    """
+    data = await request.json()
+    mot_de_passe = data.get("mot_de_passe")
+    if not mot_de_passe:
+        raise HTTPException(status_code=400, detail="Le champ 'mot_de_passe' est requis")
+
+    if "id" in data and isinstance(data.get("id"), int):
+        user = verify_user_password(db, user_id=data.get("id"), plain_password=mot_de_passe)
+        if not user:
+            raise HTTPException(status_code=401, detail="Mot de passe incorrect ou utilisateur introuvable")
+        return {"message": "Mot de passe correct"}
+
+    if "email" in data and isinstance(data.get("email"), str):
+        email = data.get("email")
+        user_obj = db.query(User).filter(User.email == email).first()
+        if not user_obj:
+            raise HTTPException(status_code=404, detail="Utilisateur introuvable pour cet email")
+        user = verify_user_password(db, user_id=user_obj.id, plain_password=mot_de_passe)
+        if not user:
+            raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+        return {"message": "Mot de passe correct"}
+
+    raise HTTPException(status_code=400, detail="Corps invalide : fournir 'id' (int) ou 'email' (str) et 'mot_de_passe'")
+
+
+@router.post("/verifyOldPassword")
+async def verify_old_password_endpoint(request: Request, db: Session = Depends(get_db)):
+    """Compatibilité : accepte {id, mot_de_passe} ou {email, mot_de_passe}."""
+    data = await request.json()
+    mot_de_passe = data.get("mot_de_passe")
+    if not mot_de_passe:
+        raise HTTPException(status_code=400, detail="Le champ 'mot_de_passe' est requis")
+
+    if "id" in data and isinstance(data.get("id"), int):
+        user = verify_user_password(db, user_id=data.get("id"), plain_password=mot_de_passe)
+        if not user:
+            raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+        return {"message": "Mot de passe correct"}
+
+    if "email" in data and isinstance(data.get("email"), str):
+        email = data.get("email")
+        user_obj = db.query(User).filter(User.email == email).first()
+        if not user_obj:
+            raise HTTPException(status_code=404, detail="Utilisateur introuvable pour cet email")
+        user = verify_user_password(db, user_id=user_obj.id, plain_password=mot_de_passe)
+        if not user:
+            raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+        return {"message": "Mot de passe correct"}
+
+    raise HTTPException(status_code=400, detail="Corps invalide : fournir 'id' (int) ou 'email' (str) et 'mot_de_passe'")

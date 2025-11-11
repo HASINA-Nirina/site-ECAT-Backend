@@ -8,11 +8,12 @@ from models.models import User
 
 router = APIRouter(prefix="/paiement", tags=["Paiement"])
 
-@router.get("/ReadPaiement/", response_model=list[PaiementResponse])
+@router.get("/ReadPaiement/")
 def read_paiements(db: Session = Depends(get_db)):
+    # Retourne une liste déjà transformée par le contrôleur (dicts)
     return get_all_paiements(db)
 
-@router.get("/ReadPaiement/{idPaiement}", response_model=PaiementResponse)
+@router.get("/ReadPaiement/{idPaiement}")
 def read_paiement(idPaiement: int, db: Session = Depends(get_db)):
     return get_paiement_by_id(db, idPaiement)
 
