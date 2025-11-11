@@ -1,12 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form, Request,Response
 from sqlalchemy.orm import Session
 from Core.database import get_db
-from schemas.user_schemas import UserCreate, UserLogin
 from Controllers.user_controllers import create_user, authenticate_user_role
 import jwt, os, shutil
 from Core.config import SECRET_KEY, ALGORITHM
 from models.models import Notification, User
 from dependencies import get_current_user
+from schemas.user_schemas import Province,AdminUpdateStatus, UserCreate,EtudiantOut, UserResponse,UserLogin,EmailRequest,VerifyOTPRequest,ChangePassword,EtudiantResponse,UserReadLocal,UserUpdate,PasswordVerify,UserLivreAccessCheck
+from models.models import User,Sujet
+from Controllers.user_controllers import get_etudiants, get_all_admins_locaux,update_admin_status, get_etudiants_by_province,get_current_user,create_user, get_user_by_email,authenticate_user_role, modif_password ,get_all_etudiant ,update_user,verify_user_password
+from Controllers.Otp_controlllers import sendOtp,verify_otp
+from Core.security import hash_password
+from jwt.exceptions import ExpiredSignatureError
+from typing import List
 
 
 
@@ -72,6 +78,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
             "email": user.email,
             "image": image_url,
             "theme": user.theme,
+            "province": user.province,
         }
 
     except jwt.ExpiredSignatureError:
@@ -321,4 +328,94 @@ def mark_notifications_read(
     return {"message": "Notifications marquées comme lues"}
 
 
+@router.get("/GetAdminLocaux")
+def list_admins_locaux(db: Session = Depends(get_db)):
+    print(get_all_admins_locaux(db))
+    return get_all_admins_locaux(db)
+
+@router.put("/ChangeStatus/{admin_id}")
+def change_admin_status(admin_id: int, body: AdminUpdateStatus, db: Session = Depends(get_db)):
+    admin = update_admin_status(db, admin_id, body.statuts)
+
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin introuvable")
+
+    return {"message": "Statut mis à jour"}
+
+@router.get("/ReadEtudiantByprovince", response_model=List[EtudiantOut])
+def read_etudiants(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    return get_etudiants_by_province(current_user=current_user, db=db)
+
+
+@router.get("/ReadEtudiantByprovince/{province}", response_model=List[EtudiantOut])
+def read_etudiants(province: str, db: Session = Depends(get_db)):
+    return get_etudiants(province =province , db=db)
+
+
+@router.get("/ReadEtudiantAll", response_model=list[EtudiantResponse])
+def read_etudiant(db: Session = Depends(get_db)):
+    return get_all_etudiant(db)
+
+
+############OTP################
+@router.post("/sendOtp")
+async def send_otp(data: EmailRequest , db: Session = Depends(get_db)):
+    print(" Données reçues :", data)
+    existing_user = db.query(User).filter(User.email == data.email).first()
+
+    if existing_user:
+        await sendOtp(data.email, db)
+        return {"message": "otp envoyer"}
+
+    print("email n existe pas ")
+    return {"error":"Cet e-mail email n existe pas"}
+
+@router.post("/verify")
+def check_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)):
+    return  verify_otp(data.email, data.code, db)
+   
+
+@router.post("/modifPassword")
+def modif_password_endpoint(data: ChangePassword, db: Session = Depends(get_db)):
+    print(f"Données reçues : email={data.email}, mot_de_passe={data.mot_de_passe}")
+    
+    try:
+        success = modif_password(data.email, data.mot_de_passe, db)
+        return {"success": True, "message": "Mot de passe modifié avec succès !"}
+    except Exception as e:
+        print("Erreur :", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.put("/UpdateUser/{user_id}")
+def modif_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):
+    user = update_user(db, user_id, data)
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    return {"message": "Utilisateur modifié avec succès"}
+
+
+@router.post("/verifyPassword")
+def verify_password_endpoint(data: PasswordVerify, db: Session = Depends(get_db)):
+    user = verify_user_password(db, data.email, data.mot_de_passe)
+    if not user:
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect ou utilisateur introuvable")
+    return {"message": "Mot de passe correct"}
+
+
+@router.post("/verifyOldPassword")
+def verify_password_endpoint(data: PasswordVerify, db: Session = Depends(get_db)):
+    print(data)
+    user = verify_user_password(db, user_id=data.id, plain_password=data.mot_de_passe)
+    if not user:
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    return {"message": "Mot de passe correct"}
+
+@router.post("/newPassword")
+def update_password_endpoint(data: ChangePassword, db: Session = Depends(get_db)):
+    print(data)
+    try:
+        modif_password(user_id=data.id, mot_de_passe=data.mot_de_passe, db=db)
+        return {"success": True, "message": "Mot de passe modifié avec succès !"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
