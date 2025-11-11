@@ -59,7 +59,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
         return {"error": True, "message": "Email ou mot de passe invalide"}
 
     try:
-        password_ok = bcrypt.verify(password, user.mot_de_passe)
+        password_ok = hash_password(user.mot_de_passe)
     except Exception:
         return {"error": True, "message": "Email ou mot de passe invalide"}
 
