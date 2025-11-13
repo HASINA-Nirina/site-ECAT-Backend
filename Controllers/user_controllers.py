@@ -177,12 +177,12 @@ def authenticate_user_role(email: str, password: str, db: Session):
     if not password_ok:
         return {"error": True, "message": "Email ou mot de passe invalide"}
 
-    # Vérifier le statut (attention : nom de colonne = statuts dans ta DB)
-    user_statut = getattr(user, "statuts", None)  # safe : si colonne s'appelle différemment, renvoie None
-    if user_statut == "en attente":
+    # Vérifier le statut 
+    user_statut = getattr(user, "statuts", None)  #  si colonne s'appelle différemment, renvoie None
+    if user_statut and user_statut.lower() == "en attente":
         return {"error": True, "message": "Votre compte est en attente de validation. Veuillez contacter l'administrateur.", "statuts": "en attente"}
 
-    if user_statut != "Actif":
+    if not user_statut or user_statut.lower() != "actif":
         # autre statut non autorisé
         return {"error": True, "message": f"Votre compte est '{user_statut}'. Contactez l'administrateur.", "statuts": user_statut}
 

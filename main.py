@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
             mot_de_passe=hashed_pw,
             role="admin",
             province=None,
-            statuts="actif"
+            statuts="Actif"
             )
             db.add(admin_user)
             db.commit()
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
         if not admin_sujet:
             admin_sujet = Sujet(
                 titre="Administratif",
-                idCreateur=1  
+                idCreateur=2
             )
             db.add(admin_sujet)
             db.commit()  
