@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models.models import User, PendingUser, UserLivreAccess, Antenne
+from models.models import User, UserLivreAccess, Antenne
 from schemas.user_schemas import UserCreate,UserReadLocal,EtudiantOut
 from typing import List
 from sqlalchemy import or_

@@ -39,6 +39,8 @@ class Notification(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     type = Column(String, default="general")             # info / invitation
     related_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    #Modifier zao
+    user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
 
 class Antenne(Base):
     __tablename__ = "antenne"
@@ -50,9 +52,9 @@ class Antenne(Base):
         return f"<Antenne id={self.id} province={self.province}>"
 
     # relation to users
-   # users = relationship("User", back_populates="antenne")
-    user = relationship("User", foreign_keys=[user_id], back_populates="notifications")
-    related_user = relationship("User", foreign_keys=[related_user_id])  # pour accéder à l’admin local
+    users = relationship("User", back_populates="antenne")
+    #user = relationship("User", foreign_keys=[user_id], back_populates="notifications")
+    #related_user = relationship("User", foreign_keys=[related_user_id])  # pour accéder à l’admin local
 class OTP(Base):
     __tablename__ = "otps"
 

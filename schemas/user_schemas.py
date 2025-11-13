@@ -10,13 +10,8 @@ class UserCreate(BaseModel):
     mot_de_passe: str
     province: str | None = None
     role: str
-<<<<<<< HEAD
     province: str
     statuts: str = "En attente"
-    
-=======
-    statuts: str = "En attente"
-
 class UserLogin(BaseModel):
     email: EmailStr
     mot_de_passe: str
@@ -26,8 +21,6 @@ class UserRead(UserCreate):
 
     class config:
         orm_mode = True
-
->>>>>>> e2a64b013287f47b6535f916a37ef3f72fc57eeb
 class AdminUpdateStatus(BaseModel):
     statuts: str
 class AdminLocalBase(BaseModel):
@@ -58,7 +51,6 @@ class EtudiantResponse(BaseModel):
     email: EmailStr
     province: str
 
-<<<<<<< HEAD
     class Config:
         orm_mode = True
 
@@ -74,8 +66,6 @@ class UserRead(UserCreate):
 
 class UserRead(UserCreate):
     id: int
-=======
->>>>>>> e2a64b013287f47b6535f916a37ef3f72fc57eeb
 class EmailRequest(BaseModel):
     email: EmailStr
 

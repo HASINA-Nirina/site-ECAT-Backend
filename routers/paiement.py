@@ -10,7 +10,7 @@ router = APIRouter(prefix="/paiement", tags=["Paiement"])
 
 @router.get("/ReadPaiement/")
 def read_paiements(db: Session = Depends(get_db)):
-    # Retourne une liste déjà transformée par le contrôleur (dicts)
+    
     return get_all_paiements(db)
 
 @router.get("/ReadPaiement/{idPaiement}")

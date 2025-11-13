@@ -11,7 +11,9 @@ from models.models import User, Sujet
 from Core.security import hash_password
 from fastapi.staticfiles import StaticFiles
 
-Base.metadata.create_all(bind=engine)
+#Modifier 
+Base.metadata.create_all(bind=engine, checkfirst=True)
+
 
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
