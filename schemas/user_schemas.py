@@ -10,9 +10,24 @@ class UserCreate(BaseModel):
     mot_de_passe: str
     province: str | None = None
     role: str
+<<<<<<< HEAD
     province: str
     statuts: str = "En attente"
     
+=======
+    statuts: str = "En attente"
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    mot_de_passe: str
+
+class UserRead(UserCreate):
+    id: int
+
+    class config:
+        orm_mode = True
+
+>>>>>>> e2a64b013287f47b6535f916a37ef3f72fc57eeb
 class AdminUpdateStatus(BaseModel):
     statuts: str
 class AdminLocalBase(BaseModel):
@@ -43,6 +58,7 @@ class EtudiantResponse(BaseModel):
     email: EmailStr
     province: str
 
+<<<<<<< HEAD
     class Config:
         orm_mode = True
 
@@ -58,6 +74,8 @@ class UserRead(UserCreate):
 
 class UserRead(UserCreate):
     id: int
+=======
+>>>>>>> e2a64b013287f47b6535f916a37ef3f72fc57eeb
 class EmailRequest(BaseModel):
     email: EmailStr
 
@@ -67,9 +85,6 @@ class SendOTPRequest(BaseModel):
 class VerifyOTPRequest(BaseModel):
     email: EmailStr
     code: str
-class UserLogin(BaseModel):
-    email: EmailStr
-    mot_de_passe: str
 
 class ChangePassword(BaseModel):
     id: int 
@@ -78,12 +93,7 @@ class ChangePassword(BaseModel):
 class UserReadLocal(BaseModel):
       province: str
 
-
-     #        FORMATION       #
-
-
-
-
+     #FORMATION#
 class FormationBase(BaseModel):
     titre: str
     description: str
@@ -99,8 +109,6 @@ class FormationResponse(FormationBase):
     idFormation: int
     date_creation: datetime
 
-
-
 class UserUpdate(BaseModel):
     nom: str
     prenom: str
@@ -108,7 +116,6 @@ class UserUpdate(BaseModel):
 class PasswordVerify(BaseModel):
     id: int
     mot_de_passe: str 
-
 
 #########################Paiement################################
 class PaymentStatus(str, Enum):
@@ -168,7 +175,6 @@ class UserLivreAccessCheck(BaseModel):
     idUser: int
     idLivre: int
 
-
 ###################Forum################
 
 class MessageCreate(BaseModel):
@@ -176,8 +182,6 @@ class MessageCreate(BaseModel):
     idSujet: int
     contenu: str
     idParentMessage: Optional[int] = None
-
-
 
 class MessageOut(BaseModel):
     idMessage: int
@@ -201,5 +205,4 @@ class SujetOut(BaseModel):
         model_config = {
     "from_attributes": True
 }
-
 
