@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import random
 
-#conf = settings.MAIL_CONFIG
+conf = settings.MAIL_CONFIG
 
 async def sendOtp(email: str, db: Session):
     try:

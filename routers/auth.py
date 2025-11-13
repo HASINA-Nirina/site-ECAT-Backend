@@ -148,12 +148,19 @@ async def send_otp(data: EmailRequest , db: Session = Depends(get_db)):
 @router.post("/verify")
 def check_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)):
     return  verify_otp(data.email, data.code, db)
-   
+
+@router.get("/ReadUser")
+def read_user(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    return {"id": user.id}
+
+
 
 
 @router.post("/modifPassword")
 def modif_password_endpoint(data: ChangePassword, db: Session = Depends(get_db)):
-    # ChangePassword attendu : { id: int, mot_de_passe: str }
     print(f"Données reçues : id={data.id}, mot_de_passe=***")
     try:
         success = modif_password(user_id=data.id, mot_de_passe=data.mot_de_passe, db=db)
