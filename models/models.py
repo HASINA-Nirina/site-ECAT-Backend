@@ -126,6 +126,7 @@ class Sujet(Base):
     titre = Column(String, nullable=False)
     idCreateur = Column(Integer, ForeignKey("user.id"), nullable=False)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
+    image = Column(String, nullable=True)
 
     # Relation vers les messages
     messages = relationship("Message", back_populates="sujet")

@@ -110,3 +110,4 @@ app.include_router(forum.router)
 
 # --- Pour servir les images uploadées ---
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/upload", StaticFiles(directory="upload"), name="upload")

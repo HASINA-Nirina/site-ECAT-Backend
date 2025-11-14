@@ -188,7 +188,16 @@ class SujetOut(BaseModel):
     titre: str
     idCreateur: int
     date_creation: datetime
+    image: str | None = None
     messages: List[MessageOut] = []
+
+class SujetResponse(BaseModel):
+    idSujet: int
+    titre: str
+    idCreateur: int
+    date_creation: datetime
+    image: str | None = None  # nouveau champ
+
 
     class config:
         orm_mode = True
