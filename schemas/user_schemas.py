@@ -183,6 +183,12 @@ class MessageOut(BaseModel):
     class Config:
         orm_mode = True
 
+class MessageResponse(BaseModel):
+    id: int
+    contenu: str
+    idSujet: int
+    idSender: int
+
 class SujetOut(BaseModel):
     idSujet: int
     titre: str
@@ -198,7 +204,26 @@ class SujetResponse(BaseModel):
     date_creation: datetime
     image: str | None = None  # nouveau champ
 
+class SenderSchema(BaseModel):
+    id: int
+    nom: str
+    prenom: str
+    email: str
+    image: Optional[str] = None 
+class MessageSchema(BaseModel):
+    idMessage: int
+    idSender: int
+    idSujet: int
+    contenu: str
+    fichier: Optional[str] = None
+    date_creation: datetime
+    idParentMessage: Optional[int] = None
+    
+    # 💡 AJOUT : Intégrer les données de l'expéditeur
+    sender: SenderSchema
 
+    class Config:
+        from_attributes = True
     class config:
         orm_mode = True
         model_config = {

@@ -52,13 +52,13 @@ async def lifespan(app: FastAPI):
             print("✅ Admin super créé")
 
         # --- Création du sujet Administratif si nécessaire ---
-        # Utilisation de l'ID réel de l'admin
         admin_id = admin.id if admin else admin_user.id
         admin_sujet = db.query(Sujet).filter(Sujet.titre == "Administratif").first()
         if not admin_sujet:
             admin_sujet = Sujet(
                 titre="Administratif",
-                idCreateur=admin_id
+                idCreateur=admin_id,
+                province="admin"
             )
             db.add(admin_sujet)
             db.commit()

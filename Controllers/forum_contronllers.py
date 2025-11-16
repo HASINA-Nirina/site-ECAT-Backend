@@ -6,18 +6,44 @@ from typing import Optional
 import shutil
 import os
 import uuid
+from typing import Dict, List
+from fastapi import WebSocket
+import asyncio
+from sqlalchemy.future import select
+from models.models import User
 
-def ajouter_message(db: Session, data: MessageCreate):
+def get_user_details(db: Session, user_id: int) -> User | None:
+    return db.query(User).filter(User.id == user_id).first()
+
+
+
+
+async def ajouter_message(db: Session, data: MessageCreate):
     message = Message(
-        idSender=data.idSender,
-        idSujet=data.idSujet,
         contenu=data.contenu,
-        idParentMessage=data.idParentMessage
+        idSujet=data.idSujet,
+        idSender=data.idSender
     )
     db.add(message)
     db.commit()
     db.refresh(message)
-    return message
+
+ 
+    # Envoyer via websocket
+    await manager.send_message_to_sujet(message.idMessage, {
+        "id": message.idMessage,
+        "contenu": message.contenu,
+        "idSujet": message.idSujet,
+        "idSender": message.idSender
+    })
+
+    # Retourner un dictionnaire conforme à MessageResponse
+    return {
+        "id": message.idMessage,
+        "contenu": message.contenu,
+        "idSujet": message.idSujet,
+        "idSender": message.idSender
+    }
 
 
 def get_all_sujets(db: Session):
@@ -50,3 +76,27 @@ async def create_sujet(db: Session, titre: str, idCreateur: int, image: Optional
     db.commit()
     db.refresh(new_sujet)
     return new_sujet
+
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[int, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, idSujet: int):
+        await websocket.accept()
+        if idSujet not in self.active_connections:
+            self.active_connections[idSujet] = []
+        self.active_connections[idSujet].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, idSujet: int):
+        if idSujet in self.active_connections:
+            self.active_connections[idSujet].remove(websocket)
+
+    async def send_message_to_sujet(self, idSujet: int, message: dict):
+        if idSujet in self.active_connections:
+            for connection in self.active_connections[idSujet]:
+                await connection.send_json(message)
+
+# Crée l’instance globale du manager
+manager = ConnectionManager()

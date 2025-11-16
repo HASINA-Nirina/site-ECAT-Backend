@@ -110,18 +110,20 @@ def login(credentials: UserLogin,response: Response, db: Session = Depends(get_d
     user = db.query(User).filter(User.email == credentials.email).first()
     if user.role == "Admin Local":
     # Trouver si un sujet pour cette province existe déjà
-        province_sujet = db.query(Sujet).filter(Sujet.titre == user.province).first()
+        titre_sujet = f"Forum – Province {user.province}"
 
-        # Si pas encore de sujet  on le crée
+        province_sujet = db.query(Sujet).filter(Sujet.titre == titre_sujet).first()
+
+        # Si pas encore de sujet → on le crée
         if not province_sujet:
             province_sujet = Sujet(
-                titre=user.province,
-                idCreateur=user.id  #  Id de l’utilisateur connecté !
+                titre=titre_sujet,
+                province=user.province,
+                idCreateur=user.id
             )
             db.add(province_sujet)
             db.commit()
             db.refresh(province_sujet)
-
    
 
     return {

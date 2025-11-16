@@ -127,6 +127,7 @@ class Sujet(Base):
     idCreateur = Column(Integer, ForeignKey("user.id"), nullable=False)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
     image = Column(String, nullable=True)
+    province = Column(String)  
 
     # Relation vers les messages
     messages = relationship("Message", back_populates="sujet")
@@ -139,6 +140,7 @@ class Message(Base):
     idSender = Column(Integer, ForeignKey("user.id"), nullable=False)
     idSujet = Column(Integer, ForeignKey("sujet.idSujet"), nullable=False)
     contenu = Column(String, nullable=False)
+    fichier = Column(String, nullable=True)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
     idParentMessage = Column(Integer, ForeignKey("message.idMessage"), nullable=True)  # pour réponses imbriquées
 
