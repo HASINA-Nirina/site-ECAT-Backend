@@ -67,29 +67,32 @@ class Formation(Base):
     __tablename__ = "formation"
 
     idFormation = Column(Integer, primary_key=True, index=True)
-    titre = Column(String,nullable=False)
+    titre = Column(String, nullable=False)
     description = Column(String, nullable=False)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
     image = Column(String, nullable=True)
 
-    livre = relationship("Livre", back_populates="Formation")
+    # Relation vers les livres
+    livres = relationship("Livre", back_populates="formation", cascade="all, delete-orphan")
+
 
 class Livre(Base):
     __tablename__ = "livre"
 
     idLivre = Column(Integer, primary_key=True, index=True)
-    idFormation = Column(Integer, ForeignKey("formation.idFormation"), nullable=False)
-    titre = Column(String,nullable=False)
+    idFormation = Column(Integer, ForeignKey("formation.idFormation", ondelete="CASCADE"), nullable=False)
+    titre = Column(String, nullable=False)
     auteur = Column(String, nullable=True)
     urlPdf = Column(String, nullable=False)
     image = Column(String, nullable=True)
-    prix = Column(Float,nullable=False)
-    description = Column(String,nullable=True)
-    
+    prix = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
 
     paiements = relationship("Paiement", back_populates="livre")
     
-    Formation = relationship("Formation", back_populates="livre")
+    # Relation vers la formation
+    formation = relationship("Formation", back_populates="livres")
+
 class UserLivreAccess(Base):
     __tablename__ = "user_livre_access"
 
@@ -133,6 +136,7 @@ class Sujet(Base):
     messages = relationship("Message", back_populates="sujet")
 
 
+
 class Message(Base):
     __tablename__ = "message"
 
@@ -142,8 +146,10 @@ class Message(Base):
     contenu = Column(String, nullable=False)
     fichier = Column(String, nullable=True)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
-    idParentMessage = Column(Integer, ForeignKey("message.idMessage"), nullable=True)  # pour réponses imbriquées
+    idParentMessage = Column(Integer, ForeignKey("message.idMessage"), nullable=True)
 
-    # Relations
+
     sujet = relationship("Sujet", back_populates="messages")
     parent = relationship("Message", remote_side=[idMessage], backref="reponses")
+    
+    sender = relationship("User", foreign_keys=[idSender])

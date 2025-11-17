@@ -95,10 +95,11 @@ class FormationCreate(FormationBase):
 class FormationUpdate(FormationBase):
     pass
 
-class FormationResponse(FormationBase):
+class FormationResponse(BaseModel):
     idFormation: int
-    date_creation: datetime
-
+    titre: str
+    description: str
+    image: str | None
 class UserUpdate(BaseModel):
     nom: str
     prenom: str
@@ -166,13 +167,6 @@ class UserLivreAccessCheck(BaseModel):
     idLivre: int
 
 ###################Forum################
-
-class MessageCreate(BaseModel):
-    idSender: int
-    idSujet: int
-    contenu: str
-    idParentMessage: Optional[int] = None
-
 class MessageOut(BaseModel):
     idMessage: int
     idSender: int
@@ -182,12 +176,6 @@ class MessageOut(BaseModel):
 
     class Config:
         orm_mode = True
-
-class MessageResponse(BaseModel):
-    id: int
-    contenu: str
-    idSujet: int
-    idSender: int
 
 class SujetOut(BaseModel):
     idSujet: int
@@ -218,7 +206,22 @@ class MessageSchema(BaseModel):
     fichier: Optional[str] = None
     date_creation: datetime
     idParentMessage: Optional[int] = None
-    
+class MessageCreate(BaseModel):
+    idSujet: int
+    idCreateur: int
+    content: str
+    fileUrl: str | None = None
+
+class MessageResponse(BaseModel):
+    idMessage: int
+    idSujet: int
+    idCreateur: int
+    content: str
+    fileUrl: str | None
+    created_at: datetime
+
+    class Config:
+        orm_mode = True    
     # 💡 AJOUT : Intégrer les données de l'expéditeur
     sender: SenderSchema
 
