@@ -5,7 +5,28 @@ from models.models import Paiement, User
 # Récupérer tous les paiements
 def get_all_paiements(db: Session):
     paiements = db.query(Paiement).all()
-    return paiements
+    result = []
+    for p in paiements:
+        # tenter d'accéder à l'utilisateur lié si la relation existe
+        try:
+            utilisateur = p.utilisateur
+            nom = f"{utilisateur.nom} {utilisateur.prenom}" if utilisateur else ""
+            antenne = getattr(utilisateur, "province", None) if utilisateur else None
+        except Exception:
+            nom = ""
+            antenne = None
+
+        result.append({
+            "id": getattr(p, "idPaiement", getattr(p, "id", None)),
+            "etudiant": nom,
+            "antenne": antenne or getattr(p, "province", ""),
+            "montant": getattr(p, "montant", 0),
+            "date": getattr(p, "date_creation", None).strftime("%Y-%m-%d") if getattr(p, "date_creation", None) else None,
+            "statut": getattr(p, "status", getattr(p, "statut", "")) or "",
+            "operateur": getattr(p, "operateur", None),
+        })
+
+    return result
 
 # Récupérer un paiement par ID
 def get_paiement_by_id(db: Session, idPaiement: int):

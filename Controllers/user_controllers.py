@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
-from passlib.hash import bcrypt
-from models.models import User, UserLivreAccess
+from models.models import User, UserLivreAccess, Antenne
 from schemas.user_schemas import UserCreate,UserReadLocal,EtudiantOut
 from typing import List
 from fastapi import HTTPException,Depends
@@ -162,7 +161,17 @@ def get_user_by_email(email: str, db: Session):
     return db.query(User).filter(User.email == email).first()
 
 def get_all_etudiant(db: Session):
-    return db.query(User).filter(User.role == "etudiant").all()
+    etudiants = db.query(User).filter(User.role == "etudiante").all()
+    results = []
+    for e in etudiants:
+        results.append({
+            "id": e.id,
+            "nom": e.nom,
+            "prenom": e.prenom,
+            "email": e.email,
+            "province": getattr(e, "province", ""),
+        })
+    return results
  
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -209,7 +218,84 @@ def get_etudiants(province:str, db: Session = Depends(get_db)) -> List[EtudiantO
         )
         for e in etudiants
     ]
+def create_user(db: Session, user: UserCreate):
+    """
+    Crée un utilisateur dans la table `user`.
+    Pour Admin Local, le statut sera 'en attente'.
+    """
+   
+    hashed_password = hash_password(user.mot_de_passe)
 
+    # Déterminer le statut selon le rôle
+    if user.role.lower() == "Admin Local":
+        statut_initial = "en attente"
+    elif user.role.lower() in ["etudiante", "admin"]:
+        statut_initial = "Actif"
+    else:
+        statut_initial = "en attente"
+
+    db_user = User(
+        nom=user.nom,
+        prenom=user.prenom,
+        email=user.email,
+        mot_de_passe=hashed_password,
+        province=user.province,
+        role=user.role,
+        statuts=statut_initial
+    )
+
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+
+
+def authenticate_user_role(email: str, password: str, db: Session):
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        # Pas d'utilisateur → erreur classique
+        return {"error": True, "message": "Email ou mot de passe invalide"}
+
+    # Vérifier le mot de passe
+    #pwd_bytes = password[:72].encode('utf-8')
+    try:
+        # Vérifier le mot de passe en comparant le mot de passe fourni (plain) avec le hash stocké
+        password_ok = verify_password(password, user.mot_de_passe)
+    except Exception:
+        # en cas d'erreur de vérification (ex: hash corrompu)
+        return {"error": True, "message": "Email ou mot de passe invalide"}
+
+    if not password_ok:
+        return {"error": True, "message": "Email ou mot de passe invalide"}
+
+    # Vérifier le statut 
+    user_statut = getattr(user, "statuts", None)  #  si colonne s'appelle différemment, renvoie None
+    if user_statut and user_statut.lower() == "en attente":
+        return {"error": True, "message": "Votre compte est en attente de validation. Veuillez contacter l'administrateur.", "statuts": "en attente"}
+
+    if not user_statut or user_statut.lower() != "actif":
+        # autre statut non autorisé
+        return {"error": True, "message": f"Votre compte est '{user_statut}'. Contactez l'administrateur.", "statuts": user_statut}
+
+    # Si tout ok -> générer token
+    payload = {
+        "sub": user.email,
+        "role": user.role,
+        "nom": user.nom,
+        "prenom": user.prenom,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=6),
+    }
+
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    return {
+        "error": False,
+        "role": user.role,
+        "token": token
+    }
 
 def create_pending_user(db: Session, user: UserCreate):
     """
@@ -265,4 +351,73 @@ def update_admin_status(db: Session, admin_id: int, new_status: str):
     db.commit()
     db.refresh(admin)
     return admin
+def sync_and_get_antennes(db: Session):
+    """Synchronize Antenne table from distinct User.province values and return list of antennes."""
+    rows = db.query(User.province).filter(User.province != None).distinct().all()
+    # rows are tuples like [(province,), ...]
+    provinces = [ (r[0] or "").strip().replace("\u00A0", " ") for r in rows ]
 
+    # normalize simple variants: collapse spaces
+    def normalize(s: str) -> str:
+        return " ".join(s.split()).strip()
+
+    normalized = [normalize(p) for p in provinces if p]
+
+    created = False
+    for p in normalized:
+        if not db.query(Antenne).filter(Antenne.province == p).first():
+            a = Antenne(province=p)
+            db.add(a)
+            created = True
+
+    if created:
+        db.commit()
+
+    antennes = db.query(Antenne).filter(Antenne.actif == True).all()
+    # return simple list of dicts
+    return [ {"id": a.id, "province": a.province, "description": a.description, "actif": a.actif} for a in antennes ]
+       
+
+def get_stats_by_antenne(db: Session):
+    """
+    Retourne des statistiques agrégées par antenne.
+    Format renvoyé : [{"antenne": str, "students": int, "admins": int}, ...]
+
+    La fonction utilise la table `Antenne` si elle contient des lignes ; sinon elle dérive la liste
+    des antennes depuis les valeurs distinctes dans `user.province`.
+    Elle tente également de prendre en compte la colonne `user.antenne_id` si elle existe, pour
+    faire des correspondances plus robustes.
+    """
+    # essayer de lire les antennes canonique
+    antennes_rows = db.query(Antenne).all()
+
+    provinces = []
+    if antennes_rows:
+        provinces = [{"id": a.id, "province": a.province} for a in antennes_rows]
+    else:
+        rows = db.query(User.province).filter(User.province != None).distinct().all()
+        provinces = [{"id": None, "province": (r[0] or "").strip()} for r in rows if r[0]]
+
+    results = []
+    # Détecter si la colonne antenne_id existe sur le modèle User
+    has_antenne_id = hasattr(User, "antenne_id")
+
+    for p in provinces:
+        prov_text = p["province"]
+        if p.get("id") is not None and has_antenne_id:
+            # compter students/admins soit via antenne_id soit via province (tolérance)
+            students_count = db.query(User).filter(User.role == "etudiante").filter(
+                or_(User.antenne_id == p["id"], User.province == prov_text)
+            ).count()
+            admins_count = db.query(User).filter(User.role == "Admin Local").filter(
+                or_(User.antenne_id == p["id"], User.province == prov_text)
+            ).count()
+        else:
+            students_count = db.query(User).filter(User.role == "etudiante", User.province == prov_text).count()
+            admins_count = db.query(User).filter(User.role == "Admin Local", User.province == prov_text).count()
+
+        results.append({"antenne": prov_text, "students": students_count, "admins": admins_count})
+
+    # trier par nombre d'étudiants décroissant
+    results.sort(key=lambda x: x["students"], reverse=True)
+    return results

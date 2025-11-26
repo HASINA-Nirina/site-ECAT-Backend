@@ -2,7 +2,7 @@ import sys, os
 sys.path.append(os.path.dirname(__file__))
 
 from fastapi import FastAPI
-from routers import auth, formation, paiement, livre, forum
+from routers import auth, formation, paiement, livre, forum, antenne 
 from Core.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -11,8 +11,9 @@ from models.models import User, Sujet
 from Core.security import hash_password
 from fastapi.staticfiles import StaticFiles
 
-# CRÉE LES TABLES
-Base.metadata.create_all(bind=engine)
+
+Base.metadata.create_all(bind=engine, checkfirst=True)
+
 
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
@@ -23,6 +24,16 @@ async def lifespan(app: FastAPI):
         admin_email = "jeandedieuhasinirina82@gmail.com"
         admin = db.query(User).filter(User.email == admin_email).first()
         if not admin:
+            hashed_pw = hash_password("admin123")
+            admin_user = User(
+            nom="Admin",
+            prenom="Principal",
+            email=admin_email,
+            mot_de_passe=hashed_pw,
+            role="admin",
+            province=None,
+            statuts="Actif")
+
             hashed_pw = hash_password("uy:/p1hvfhasinaC")
             admin_user = User(
                 nom="HASINIRINA",
@@ -33,22 +44,21 @@ async def lifespan(app: FastAPI):
                 province="Fianarantsoa",
                 image=None,
                 statuts="Actif",
-                theme="light",
-                
-            )
+                theme="light",)
+            
             db.add(admin_user)
             db.commit()
             db.refresh(admin_user)
             print("✅ Admin super créé")
 
         # --- Création du sujet Administratif si nécessaire ---
-        # Utilisation de l'ID réel de l'admin
         admin_id = admin.id if admin else admin_user.id
         admin_sujet = db.query(Sujet).filter(Sujet.titre == "Administratif").first()
         if not admin_sujet:
             admin_sujet = Sujet(
                 titre="Administratif",
-                idCreateur=admin_id
+                idCreateur=admin_id,
+                province="admin"
             )
             db.add(admin_sujet)
             db.commit()
@@ -97,6 +107,8 @@ app.include_router(formation.router)
 app.include_router(paiement.router)
 app.include_router(livre.router)
 app.include_router(forum.router)
+app.include_router(antenne.router)
 
 # --- Pour servir les images uploadées ---
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/upload", StaticFiles(directory="upload"), name="upload")

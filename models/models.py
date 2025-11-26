@@ -1,10 +1,12 @@
+from sqlalchemy import Column, Integer, String,func
 from Core.database import Base
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey ,Enum ,Boolean
 from schemas.user_schemas import PaymentStatus
 from datetime import datetime, timedelta
 from datetime import datetime, timezone
+from sqlalchemy.orm import relationship
+from Core.security import hash_password 
 
 class User(Base):
     __tablename__ = "user"
@@ -16,6 +18,7 @@ class User(Base):
     mot_de_passe = Column(String, nullable=False)
     role = Column(String, nullable=False)
     province = Column(String, nullable=True)
+    antenne_id = Column(Integer, ForeignKey("antenne.id"), nullable=True)
     image = Column(String, nullable=True)
     statuts = Column(String, nullable=False)
     theme = Column(String, default="light")
@@ -24,6 +27,7 @@ class User(Base):
     # Ajouter la relation vers Notification
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan", foreign_keys="Notification.user_id")
     paiements = relationship("Paiement", back_populates="utilisateur")
+    antenne = relationship("Antenne", back_populates="users")
 
 class Notification(Base):
     __tablename__ = "notifications"
@@ -35,10 +39,16 @@ class Notification(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     type = Column(String, default="general")             # info / invitation
     related_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    #Modifier zao
+    user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
 
+class Antenne(Base):
+    __tablename__ = "antenne"   
 
-    user = relationship("User", foreign_keys=[user_id], back_populates="notifications")
-    related_user = relationship("User", foreign_keys=[related_user_id])  # pour accéder à l’admin local
+    id = Column(Integer, primary_key=True, index=True)
+    province = Column(String, unique=True, nullable=False)
+    # relation to users
+    users = relationship("User", back_populates="antenne")
 class OTP(Base):
     __tablename__ = "otps"
 
@@ -51,29 +61,32 @@ class Formation(Base):
     __tablename__ = "formation"
 
     idFormation = Column(Integer, primary_key=True, index=True)
-    titre = Column(String,nullable=False)
+    titre = Column(String, nullable=False)
     description = Column(String, nullable=False)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
     image = Column(String, nullable=True)
 
-    livre = relationship("Livre", back_populates="Formation")
+    # Relation vers les livres
+    livres = relationship("Livre", back_populates="formation", cascade="all, delete-orphan")
+
 
 class Livre(Base):
     __tablename__ = "livre"
 
     idLivre = Column(Integer, primary_key=True, index=True)
-    idFormation = Column(Integer, ForeignKey("formation.idFormation"), nullable=False)
-    titre = Column(String,nullable=False)
+    idFormation = Column(Integer, ForeignKey("formation.idFormation", ondelete="CASCADE"), nullable=False)
+    titre = Column(String, nullable=False)
     auteur = Column(String, nullable=True)
     urlPdf = Column(String, nullable=False)
     image = Column(String, nullable=True)
-    prix = Column(Float,nullable=False)
-    description = Column(String,nullable=True)
-    
+    prix = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
 
     paiements = relationship("Paiement", back_populates="livre")
     
-    Formation = relationship("Formation", back_populates="livre")
+    # Relation vers la formation
+    formation = relationship("Formation", back_populates="livres")
+
 class UserLivreAccess(Base):
     __tablename__ = "user_livre_access"
 
@@ -110,9 +123,12 @@ class Sujet(Base):
     titre = Column(String, nullable=False)
     idCreateur = Column(Integer, ForeignKey("user.id"), nullable=False)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
+    image = Column(String, nullable=True)
+    province = Column(String)  
 
     # Relation vers les messages
     messages = relationship("Message", back_populates="sujet")
+
 
 
 class Message(Base):
@@ -122,9 +138,12 @@ class Message(Base):
     idSender = Column(Integer, ForeignKey("user.id"), nullable=False)
     idSujet = Column(Integer, ForeignKey("sujet.idSujet"), nullable=False)
     contenu = Column(String, nullable=False)
+    fichier = Column(String, nullable=True)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
-    idParentMessage = Column(Integer, ForeignKey("message.idMessage"), nullable=True)  # pour réponses imbriquées
+    idParentMessage = Column(Integer, ForeignKey("message.idMessage"), nullable=True)
 
-    # Relations
+
     sujet = relationship("Sujet", back_populates="messages")
     parent = relationship("Message", remote_side=[idMessage], backref="reponses")
+    
+    sender = relationship("User", foreign_keys=[idSender])

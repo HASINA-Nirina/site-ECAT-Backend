@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models.models import Formation
+from models.models import Formation,Livre
 from schemas.user_schemas import FormationCreate, FormationUpdate
 
 
@@ -33,7 +33,10 @@ def delete_formation(db: Session, id: int):
     form = db.query(Formation).filter(Formation.idFormation == id).first()
     if not form:
         return None
+    db.query(Livre).filter(Livre.idFormation == id).delete(synchronize_session=False)
+    
     db.delete(form)
     db.commit()
     return True
+
 

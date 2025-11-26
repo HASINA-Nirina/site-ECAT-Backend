@@ -21,29 +21,44 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 def list_formations(db: Session = Depends(get_db)):
     return get_all_formations(db)
 
+
 @router.post("/NewFormation", response_model=FormationResponse)
 async def add_formation(
     titre: str = Form(...),
     description: str = Form(...),
-    image: UploadFile = File(...),
+    image: UploadFile | None = File(None),
     db: Session = Depends(get_db)
 ):
-    # sauvegarder le fichier
-    file_location = os.path.join(UPLOAD_DIR, image.filename)
-    with open(file_location, "wb") as f:
-        shutil.copyfileobj(image.file, f)
-    
-    # créer l'enregistrement DB
-    new_form = Formation(
-        titre=titre,
-        description=description,
-        image=f"/{UPLOAD_DIR}/{image.filename}"  
-    )
-    db.add(new_form)
-    db.commit()
-    db.refresh(new_form)
-    
-    return new_form
+    try:
+        image_path = None
+        if image:
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
+            file_location = os.path.join(UPLOAD_DIR, image.filename)
+            with open(file_location, "wb") as f:
+                shutil.copyfileobj(image.file, f)
+            image_path = f"/{UPLOAD_DIR}/{image.filename}"
+
+        new_form = Formation(
+            titre=titre,
+            description=description,
+            image=image_path
+        )
+        db.add(new_form)
+        db.commit()
+        db.refresh(new_form)
+
+        return FormationResponse(
+            idFormation=new_form.id,
+            titre=new_form.titre,
+            description=new_form.description,
+            image=new_form.image
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 
 @router.put("/UpdateFormation/{id}", response_model=FormationResponse)
 def edit_formation(id: int, data: FormationUpdate, db: Session = Depends(get_db)):

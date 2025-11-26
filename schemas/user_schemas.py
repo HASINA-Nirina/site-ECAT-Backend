@@ -10,8 +10,8 @@ class UserCreate(BaseModel):
     mot_de_passe: str
     province: str | None = None
     role: str
+    province: str
     statuts: str = "En attente"
-
 class UserLogin(BaseModel):
     email: EmailStr
     mot_de_passe: str
@@ -21,7 +21,6 @@ class UserRead(UserCreate):
 
     class config:
         orm_mode = True
-
 class AdminUpdateStatus(BaseModel):
     statuts: str
 class AdminLocalBase(BaseModel):
@@ -46,11 +45,27 @@ class UserResponse(BaseModel):
     email: str
     province: str
 class EtudiantResponse(BaseModel):
+    id: int
     nom: str
     prenom: str
     email: EmailStr
     province: str
 
+    class Config:
+        orm_mode = True
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    mot_de_passe: str
+
+class UserRead(UserCreate):
+    id: int
+
+    class config:
+        orm_mode = True
+
+class UserRead(UserCreate):
+    id: int
 class EmailRequest(BaseModel):
     email: EmailStr
 
@@ -80,10 +95,11 @@ class FormationCreate(FormationBase):
 class FormationUpdate(FormationBase):
     pass
 
-class FormationResponse(FormationBase):
+class FormationResponse(BaseModel):
     idFormation: int
-    date_creation: datetime
-
+    titre: str
+    description: str
+    image: str | None
 class UserUpdate(BaseModel):
     nom: str
     prenom: str
@@ -151,13 +167,6 @@ class UserLivreAccessCheck(BaseModel):
     idLivre: int
 
 ###################Forum################
-
-class MessageCreate(BaseModel):
-    idSender: int
-    idSujet: int
-    contenu: str
-    idParentMessage: Optional[int] = None
-
 class MessageOut(BaseModel):
     idMessage: int
     idSender: int
@@ -173,11 +182,69 @@ class SujetOut(BaseModel):
     titre: str
     idCreateur: int
     date_creation: datetime
+    image: str | None = None
     messages: List[MessageOut] = []
 
+class SujetResponse(BaseModel):
+    idSujet: int
+    titre: str
+    idCreateur: int
+    date_creation: datetime
+    image: str | None = None  # nouveau champ
+
+class SenderSchema(BaseModel):
+    id: int
+    nom: str
+    prenom: str
+    email: str
+    image: Optional[str] = None 
+class MessageSchema(BaseModel):
+    idMessage: int
+    idSender: int
+    idSujet: int
+    contenu: str
+    fichier: Optional[str] = None
+    date_creation: datetime
+    idParentMessage: Optional[int] = None
+class MessageCreate(BaseModel):
+    idSujet: int
+    idCreateur: int
+    content: str
+    fileUrl: str | None = None
+
+class MessageResponse(BaseModel):
+    idMessage: int
+    idSujet: int
+    idCreateur: int
+    content: str
+    fileUrl: str | None
+    created_at: datetime
+
+    class Config:
+        orm_mode = True    
+    sender: SenderSchema
+
+    class Config:
+        from_attributes = True
     class config:
         orm_mode = True
         model_config = {
     "from_attributes": True
 }
+
+class AntenneBase(BaseModel):
+    province: str
+
+class AntenneCreate(AntenneBase):
+    pass
+
+class AntenneUpdate(AntenneBase):
+    pass
+
+class AntenneOut(AntenneBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 
