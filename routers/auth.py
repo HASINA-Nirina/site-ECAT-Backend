@@ -109,7 +109,6 @@ def login(credentials: UserLogin,response: Response, db: Session = Depends(get_d
 #             db.commit()
 #             db.refresh(province_sujet)
 
-   
 
 #     return {
 #         "error": False,
