@@ -222,7 +222,6 @@ class MessageResponse(BaseModel):
 
     class Config:
         orm_mode = True    
-    # 💡 AJOUT : Intégrer les données de l'expéditeur
     sender: SenderSchema
 
     class Config:
@@ -232,4 +231,20 @@ class MessageResponse(BaseModel):
         model_config = {
     "from_attributes": True
 }
+
+class AntenneBase(BaseModel):
+    province: str
+
+class AntenneCreate(AntenneBase):
+    pass
+
+class AntenneUpdate(AntenneBase):
+    pass
+
+class AntenneOut(AntenneBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 

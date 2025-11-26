@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form, Request
 from sqlalchemy.orm import Session
 from Core.database import get_db
 from schemas.user_schemas import Province,AdminUpdateStatus, UserCreate,EtudiantOut, UserResponse,UserLogin,EmailRequest,VerifyOTPRequest,ChangePassword,EtudiantResponse,UserReadLocal,UserUpdate,PasswordVerify,UserLivreAccessCheck
-from models.models import User,Sujet,Notification
+from models.models import User,Sujet,Notification,Antenne 
 from Controllers.user_controllers import (
     get_etudiants,
     get_all_admins_locaux,
@@ -87,16 +87,111 @@ def get_stats_by_antenne_route(db: Session = Depends(get_db)):
     la liste [{antenne, students, admins}, ...].
     """
     return get_stats_by_antenne(db)
-
 @router.post("/Etudiantregister")
 def register_etudiant(data: UserCreate, db: Session = Depends(get_db)):
+    # 1. Vérification email déjà utilisé (Première étape obligatoire)
     existing_user = db.query(User).filter(User.email == data.email).first()
     if existing_user:
+        # Retourne une erreur si l'email existe
         return {"error": "Cet e-mail est déjà utilisé."}
 
-    # Création directe et active
-    db_user = create_user(db, data)
-    return {"message": "Compte étudiant créé avec succès", "user": db_user.email}
+    # 2. Création de l'étudiant (Création unique, nécessaire pour les notifications)
+    # L'étudiant est créé ici une seule fois.
+    try:
+        new_user = create_user(db, data)
+        # Note: Si create_user n'appelle pas db.commit() lui-même, vous devrez l'ajouter ici:
+        # db.commit() 
+    except Exception as e:
+        # Gérer les erreurs de création si nécessaire (ex: validation de mot de passe)
+        print(f"Erreur lors de la création de l'utilisateur: {e}")
+        return {"error": "Erreur lors de la création du compte."}
+
+
+    # 3. Vérifier si la province existe dans la table Antenne
+    antenne_exists = db.query(Antenne).filter(Antenne.antenne == data.province).first() 
+    # REMARQUE IMPORTANTE: J'ai remplacé Antenne.province par Antenne.antenne 
+    # si le nom de l'antenne est stocké dans le champ 'antenne' de la table Antenne.
+    # Si le champ est bien 'province', rétablissez-le.
+
+
+    if not antenne_exists:
+        #  A: Province inexistante
+        
+        # On notifie le super admin de la province inexistante
+        super_admins = db.query(User).filter(User.role == "admin_general").all()
+
+        for admin in super_admins:
+            notif = Notification(
+                user_id=admin.id,
+                related_user_id=new_user.id,
+                message=(
+                    f"Aucune antenne trouvée pour la province « {data.province} ». "
+                    f"L'étudiant {new_user.prenom} {new_user.nom} s'est inscrit avec une province inexistante."
+                ),
+                action_status="non_lu",
+                type="province_inexistante"
+            )
+            db.add(notif)
+
+        db.commit() # Commit la création de l'utilisateur et les notifications
+
+        return {
+            "message": "Compte étudiant créé mais la province n'existe pas.",
+            "province_error": True,
+            "user": new_user.email
+        }
+
+    #  B: Province existante (Antenne trouvée)
+
+    # 4. Vérifier s'il existe un admin local pour cette province
+    admin_local = db.query(User).filter(
+        User.role == "admin_local",
+        User.province == data.province
+    ).first()
+
+
+    if not admin_local:
+        #  B.1: Pas d'admin local → notifier admin général
+        super_admins = db.query(User).filter(User.role == "admin_general").all()
+
+        for admin in super_admins:
+            notif = Notification(
+                user_id=admin.id,
+                related_user_id=new_user.id,
+                message=(
+                    f"Aucun admin local dans l'antenne « {data.province} ». "
+                    f"L'étudiant {new_user.prenom} {new_user.nom} vient de créer un compte."
+                ),
+                action_status="non_lu",
+                type="admin_local_manquant"
+            )
+            db.add(notif)
+        
+        db.commit() # Commit la notification aux admins généraux
+
+        return {
+            "message": "Compte étudiant créé mais aucun admin local n'existe dans cette province.",
+            "admin_local_missing": True,
+            "user": new_user.email
+        }
+
+    # B.2: Succès complet (Admin local trouvé)
+    
+    # 5. Si admin local trouvé → créer notification normale
+    notif = Notification(
+        user_id=admin_local.id,
+        related_user_id=new_user.id,
+        message=f"L'étudiant {new_user.prenom} {new_user.nom} s'est inscrit dans votre province.",
+        action_status="non_lu",
+        type="nouvelle_inscription"
+    )
+    db.add(notif)
+    db.commit() # Commit la notification à l'admin local
+
+    return {
+        "message": "Compte étudiant créé avec succès.",
+        "user": new_user.email
+    }
 
 @router.post("/login")
 def login(credentials: UserLogin,response: Response, db: Session = Depends(get_db)):

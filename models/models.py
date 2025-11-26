@@ -43,18 +43,12 @@ class Notification(Base):
     user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
 
 class Antenne(Base):
-    __tablename__ = "antenne"
+    __tablename__ = "antenne"   
 
     id = Column(Integer, primary_key=True, index=True)
     province = Column(String, unique=True, nullable=False)
-
-    def __repr__(self):
-        return f"<Antenne id={self.id} province={self.province}>"
-
     # relation to users
     users = relationship("User", back_populates="antenne")
-    #user = relationship("User", foreign_keys=[user_id], back_populates="notifications")
-    #related_user = relationship("User", foreign_keys=[related_user_id])  # pour accéder à l’admin local
 class OTP(Base):
     __tablename__ = "otps"
 

@@ -18,7 +18,9 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from Core.database import get_db
 from models.models import Message
-
+from fastapi.responses import FileResponse
+import os
+import urllib.parse
 
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import Dict, List
@@ -152,21 +154,24 @@ async def ajouter_message(
     os.makedirs(upload_dir, exist_ok=True)
 
     fichier_path = None
-    if fichier is not None:  # Vérifie que le fichier existe
+    if fichier is not None:  
         ext = os.path.splitext(fichier.filename)[1]
-        save_name = f"message_{idSender}_{int(time.time())}{ext}"
+        original_name = os.path.splitext(fichier.filename)[0]
+        ext = os.path.splitext(fichier.filename)[1]
+        save_name = f"{original_name}_{idSender}_{int(time.time())}{ext}"
         fichier_path = os.path.join(upload_dir, save_name)
         with open(fichier_path, "wb") as f:
             f.write(await fichier.read())
 
-    # Créer le message dans la BDD
+    
     new_message = Message(
-        idSender=idSender,
-        idSujet=idSujet,
-        contenu=contenu,
-        fichier=fichier_path,          
-        idParentMessage=idParentMessage
-    )
+    idSender=idSender,
+    idSujet=idSujet,
+    contenu=contenu,
+    fichier=save_name if fichier is not None else None, 
+    idParentMessage=idParentMessage
+)
+
 
     db.add(new_message)
     db.commit()
@@ -206,7 +211,6 @@ async def websocket_endpoint(websocket: WebSocket, idSujet: int):
             }
             await websocket.send_json(full_message_data)  # envoie chaque message existant au client
 
-        # 4️⃣ Boucle pour recevoir les nouveaux messages
         while True:
             data = await websocket.receive_json()
             id_sender = data.get("idSender")
@@ -236,3 +240,18 @@ async def websocket_endpoint(websocket: WebSocket, idSujet: int):
     finally:
         db.close()
 
+
+
+@router.get("/filesdownload/{filename}")
+def download_file(filename: str):
+    upload_dir = "static/uploads"
+    filename = urllib.parse.unquote(filename)
+    filename = os.path.basename(filename)
+    
+    file_path = os.path.join(upload_dir, filename)
+    print(file_path)  
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(file_path, media_type="application/octet-stream", filename=filename)

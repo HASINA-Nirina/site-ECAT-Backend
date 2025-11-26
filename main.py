@@ -2,7 +2,7 @@ import sys, os
 sys.path.append(os.path.dirname(__file__))
 
 from fastapi import FastAPI
-from routers import auth, formation, paiement, livre, forum
+from routers import auth, formation, paiement, livre, forum, antenne 
 from Core.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from models.models import User, Sujet
 from Core.security import hash_password
 from fastapi.staticfiles import StaticFiles
 
-#Modifier 
+
 Base.metadata.create_all(bind=engine, checkfirst=True)
 
 
@@ -107,6 +107,7 @@ app.include_router(formation.router)
 app.include_router(paiement.router)
 app.include_router(livre.router)
 app.include_router(forum.router)
+app.include_router(antenne.router)
 
 # --- Pour servir les images uploadées ---
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
