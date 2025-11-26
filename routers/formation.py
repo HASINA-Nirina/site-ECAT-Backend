@@ -29,15 +29,22 @@ async def add_formation(
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db)
 ):
+    
     try:
         image_path = None
         if image:
+            # Création du répertoire 'uploads' s'il n'existe pas
             os.makedirs(UPLOAD_DIR, exist_ok=True)
+            
+            # Chemin complet du fichier dans le répertoire 'uploads'
             file_location = os.path.join(UPLOAD_DIR, image.filename)
+            
+            # Écriture du fichier
             with open(file_location, "wb") as f:
                 shutil.copyfileobj(image.file, f)
+            
+            # Chemin relatif stocké dans la base de données (ex: /uploads/mon_image.jpg)
             image_path = f"/{UPLOAD_DIR}/{image.filename}"
-
         new_form = Formation(
             titre=titre,
             description=description,
@@ -61,11 +68,49 @@ async def add_formation(
 
 
 @router.put("/UpdateFormation/{id}", response_model=FormationResponse)
-def edit_formation(id: int, data: FormationUpdate, db: Session = Depends(get_db)):
-    result = update_formation(db, id, data)
-    if not result:
+async def edit_formation(
+    id: int,
+    titre: str = Form(...),
+    description: str = Form(...),
+    image: UploadFile | None = File(None),
+    db: Session = Depends(get_db)
+):
+    # Récupération de la formation existante
+    form = db.query(Formation).filter(Formation.idFormation == id).first()
+    if not form:
         raise HTTPException(404, "Formation non trouvée")
-    return result
+
+    try:
+        image_path = form.image  # on garde l’ancienne si pas de nouvelle
+
+        if image:
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+            file_location = os.path.join(UPLOAD_DIR, image.filename)
+
+            with open(file_location, "wb") as f:
+                shutil.copyfileobj(image.file, f)
+
+            image_path = f"/{UPLOAD_DIR}/{image.filename}"
+
+        # Mise à jour
+        form.titre = titre
+        form.description = description
+        form.image = image_path
+
+        db.commit()
+        db.refresh(form)
+
+        return FormationResponse(
+            idFormation=form.idFormation,
+            titre=form.titre,
+            description=form.description,
+            image=form.image
+        )
+
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 
 @router.delete("/DeleteFormation/{id}")
 def remove_formation(id: int, db: Session = Depends(get_db)):
