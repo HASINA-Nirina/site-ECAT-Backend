@@ -3,7 +3,6 @@ from passlib.hash import bcrypt
 from models.models import User, UserLivreAccess
 from schemas.user_schemas import UserCreate,UserReadLocal,EtudiantOut
 from typing import List
-import bcrypt
 from fastapi import HTTPException,Depends
 import jwt
 import datetime
@@ -26,7 +25,7 @@ def create_user(db: Session, user: UserCreate):
     if existing_user:
         raise HTTPException(status_code=400, detail="Cet e-mail est déjà utilisé.")
 
-    hashed_password = bcrypt.hash(user.mot_de_passe)
+    hashed_password = hash_password (user.mot_de_passe)
 
     role_lower = user.role.lower()
     if role_lower == "admin local":
@@ -59,7 +58,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
         return {"error": True, "message": "Email ou mot de passe invalide"}
 
     try:
-        password_ok = hash_password(user.mot_de_passe)
+        password_ok = verify_password (password, user.mot_de_passe)
     except Exception:
         return {"error": True, "message": "Email ou mot de passe invalide"}
 
@@ -97,7 +96,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
         if user.role.lower() == "admin":
             expire_hours = 24  # ou 48h selon mon besoin
         else:
-            expire_hours = 9   # durée normale pour autres utilisateurs
+            expire_hours = 24   # durée normale pour autres utilisateurs
 
     #Génération du token JWT
     payload = {
@@ -115,6 +114,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
         "role": user.role,
         "token": token
     }
+    
 
 def get_all_admins_locaux(db: Session):
     admins = (
