@@ -183,6 +183,7 @@ def login(credentials: UserLogin,response: Response, db: Session = Depends(get_d
         "message": "Connexion réussie"
     }
  
+
 @router.get("/me")
 def get_current_user(request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get("token")

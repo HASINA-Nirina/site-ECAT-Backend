@@ -64,9 +64,6 @@ async def add_formation(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
-
 @router.put("/UpdateFormation/{id}", response_model=FormationResponse)
 async def edit_formation(
     id: int,
