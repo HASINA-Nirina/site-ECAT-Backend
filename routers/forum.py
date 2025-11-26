@@ -8,7 +8,6 @@ from models.models import Message,Sujet, User
 from typing import List, Optional, Union
 from .auth import get_current_user 
 from datetime import datetime, timezone
-
 from fastapi import File, UploadFile, Form
 from typing import Optional
 import os
@@ -21,7 +20,6 @@ from models.models import Message
 from fastapi.responses import FileResponse
 import os
 import urllib.parse
-
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import Dict, List
 
@@ -239,8 +237,6 @@ async def websocket_endpoint(websocket: WebSocket, idSujet: int):
 
     finally:
         db.close()
-
-
 
 @router.get("/filesdownload/{filename}")
 def download_file(filename: str):
