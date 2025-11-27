@@ -183,6 +183,42 @@ def login(credentials: UserLogin,response: Response, db: Session = Depends(get_d
         "message": "Connexion réussie"
     }
  
+<<<<<<< HEAD
+=======
+# @router.post("/login")
+# def login(credentials: UserLogin,response: Response, db: Session = Depends(get_db)):
+#     result = authenticate_user_role(credentials.email, credentials.mot_de_passe, db)
+
+#     # Si authenticate_user_role retourne une erreur structurée
+#     if isinstance(result, dict) and result.get("error"):
+#         raise HTTPException(status_code=400, detail=result.get("message"))
+    
+#     # Récupérer l'utilisateur connecté
+#     user = db.query(User).filter(User.email == credentials.email).first()
+#     if user.role == "Admin Local":
+#     # Trouver si un sujet pour cette province existe déjà
+#         province_sujet = db.query(Sujet).filter(Sujet.titre == user.province).first()
+
+#         # Si pas encore de sujet  on le crée
+#         if not province_sujet:
+#             province_sujet = Sujet(
+#                 titre=user.province,
+#                 idCreateur=user.id  #  Id de l’utilisateur connecté !
+#             )
+#             db.add(province_sujet)
+#             db.commit()
+#             db.refresh(province_sujet)
+
+
+#     return {
+#         "error": False,
+#         "token": result["token"],
+#         "role": result["role"],
+#         "province": user.province,
+#         "message": "Connexion réussie"
+#     }
+
+>>>>>>> bd29da185439e30255534265ca7b1b6c97f1cbf2
 
 @router.get("/me")
 def get_current_user(request: Request, db: Session = Depends(get_db)):
