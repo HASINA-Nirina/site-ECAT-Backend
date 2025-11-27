@@ -82,11 +82,23 @@ class Livre(Base):
     prix = Column(Float, nullable=False)
     description = Column(String, nullable=True)
 
-    paiements = relationship("Paiement", back_populates="livre")
-    
+    paiements = relationship(
+    "Paiement",
+    back_populates="livre",
+    cascade="all, delete-orphan"
+)
+
+    # Accès utilisateur lié avec suppression en cascade
+    user_access = relationship(
+        "UserLivreAccess",
+        back_populates="livre",
+        cascade="all, delete-orphan"
+    )
+
+
     # Relation vers la formation
     formation = relationship("Formation", back_populates="livres")
-
+    
 class UserLivreAccess(Base):
     __tablename__ = "user_livre_access"
 
@@ -94,7 +106,8 @@ class UserLivreAccess(Base):
     idUser = Column(Integer, ForeignKey("user.id"))
     idLivre = Column(Integer, ForeignKey("livre.idLivre"))
     canAccess = Column(Boolean, default=True)
-
+    livre = relationship("Livre", back_populates="user_access")
+    
 
 class Paiement(Base):
     __tablename__ = "paiement"

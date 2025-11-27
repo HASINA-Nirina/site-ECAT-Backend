@@ -150,7 +150,7 @@ async def ajouter_message(
     db: Session = Depends(get_db)
 ):
     # Créer le dossier uploads s'il n'existe pas
-    upload_dir = "static/uploads"
+    upload_dir = "uploads"
     os.makedirs(upload_dir, exist_ok=True)
 
     fichier_path = None
@@ -244,7 +244,7 @@ async def websocket_endpoint(websocket: WebSocket, idSujet: int):
 
 @router.get("/filesdownload/{filename}")
 def download_file(filename: str):
-    upload_dir = "static/uploads"
+    upload_dir = "uploads"
     filename = urllib.parse.unquote(filename)
     filename = os.path.basename(filename)
     

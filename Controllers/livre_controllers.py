@@ -73,8 +73,9 @@ def get_livre_debloque_by_idetudiant(db: Session, iduser: int):
             "id": livre.idLivre,
             "title": livre.titre,
             "author": livre.auteur,
-            "image": livre.urlPdf,
-            "user":iduser
+            "image": livre.image,
+            "user":iduser,
+            "pdf":livre.urlPdf
         }
         for livre in livres
         

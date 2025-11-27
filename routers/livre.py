@@ -8,7 +8,7 @@ from Controllers.livre_controllers import (
      debloque_livre, get_livre_debloque_by_idetudiant,check_user_livre_access
 )
 from schemas.user_schemas import LivreCreate, LivreUpdate, LivreResponse, LivreDebloque,LivreDebloqueResponse, UserLivreAccessCheck
-
+import os
 router = APIRouter(prefix="/livre", tags=["Livre"])
 
 @router.get("/ReadLivres/", response_model=list[LivreResponse])
@@ -35,12 +35,19 @@ async def new_livre(
     image: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    pdf_path = f"static/pdfs/{urlPdf.filename}" if urlPdf else ""
-    if urlPdf:
-        with open(pdf_path, "wb") as f:
-            f.write(urlPdf.file.read())
+    upload_dir = "uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    fichier_path = None
+    if urlPdf is not None:  
+        ext = os.path.splitext(urlPdf.filename)[1]
+        original_name = os.path.splitext(urlPdf.filename)[0]
+        ext = os.path.splitext(urlPdf.filename)[1]
+        save_name = f"{original_name}{ext}"
+        fichier_path = os.path.join(upload_dir, save_name)
+        with open(fichier_path, "wb") as f:
+            f.write(await urlPdf.read())
 
-    image_path = f"static/images/{image.filename}" if image else ""
+    image_path = f"uploads/{image.filename}" if image else ""
     if image:
         with open(image_path, "wb") as f:
             f.write(image.file.read())
@@ -52,11 +59,11 @@ async def new_livre(
         auteur=auteur,
         description=description,
         prix=prix,
-        urlPdf=pdf_path,
+        urlPdf=save_name,
         
     )
 
-    db_livre = create_livre(db, livre, pdf_path, image_path)
+    db_livre = create_livre(db, livre, save_name, image_path)
     return db_livre
 
 @router.put("/UpdateLivre/{livre_id}")
@@ -91,7 +98,7 @@ def new_access(data:LivreDebloque ,db: Session = Depends(get_db)):
     access= debloque_livre(db, data)
     return access
 
-@router.post("/livreDebloqueEtudiant/{iduser}", response_model=list[LivreDebloqueResponse])
+@router.post("/livreDebloqueEtudiant/{iduser}")
 def lire_livres_debloque(iduser: int, db: Session = Depends(get_db)):
     return get_livre_debloque_by_idetudiant(db , iduser)  
 
