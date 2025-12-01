@@ -61,21 +61,21 @@ def register_etudiant(data: UserCreate, db: Session = Depends(get_db)):
     if not admin_local:
         #  B.1: Pas d'admin local → notifier admin général
         super_admins = db.query(User).filter(User.role == "admin").all()
-        for admin in super_admins:
-            notif = Notification(
-                user_id=admin.id,
-                related_user_id=new_user.id,
-                message=
-                    f"Aucun admin local dans l'antenne « {data.province} ». "
-                    f"L'étudiant {new_user.prenom} {new_user.nom} vient de créer un compte."
-                ,
-                action_status="non_lu",
-                type="admin_local_manquant"
-            )
-            db.add(notif)
+        #for admin in super_admins:
+           # notif = Notification(
+              #  user_id=admin.id,
+              #  related_user_id=new_user.id,
+               # message=
+                #    f"Aucun admin local dans l'antenne « {data.province} ». "
+                 #   f"L'étudiant {new_user.prenom} {new_user.nom} vient de créer un compte."
+               # ,
+               # action_status="non_lu",
+               ## type="admin_local_manquant"
+           # )
+           # db.add(notif)
           # 2. Création de l'étudiant 
         try:
-            new_user = create_user(db, data)
+           new_user = create_user(db, data)
         except Exception as e:
             # Gérer les erreurs de création si nécessaire (ex: validation de mot de passe)
             print(f"Erreur lors de la création de l'utilisateur: {e}")
