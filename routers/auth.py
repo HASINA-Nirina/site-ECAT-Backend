@@ -38,6 +38,76 @@ UPLOAD_DIR = "uploads/profils"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+# @router.post("/Etudiantregister")
+# def register_etudiant(data: UserCreate, db: Session = Depends(get_db)):
+#     # Vérification email déjà utilisé
+#     existing_user = db.query(User).filter(User.email == data.email).first()
+#     if existing_user:
+#         return {"error": "Cet e-mail est déjà utilisé."}
+
+#     # 3. Vérifier si la province existe dans la table Antenne
+#     antenne_exists = db.query(Antenne).filter(Antenne.province == data.province).first() 
+ 
+
+#     #   Province existante (Antenne trouvée)
+
+#     # 4. Vérifier s'il existe un admin local pour cette province
+#     admin_local = db.query(User).filter(
+#         User.role == "Admin local",
+#         User.province == data.province
+#     ).first()
+
+
+#     if not admin_local:
+#         #  B.1: Pas d'admin local → notifier admin général
+#         super_admins = db.query(User).filter(User.role == "admin").all()
+#         for admin in super_admins:
+#             notif = Notification(
+#                 user_id=admin.id,
+#                 related_user_id=new_user.id,
+#                 message=
+#                     f"Aucun admin local dans l'antenne « {data.province} ». "
+#                     f"L'étudiant {new_user.prenom} {new_user.nom} vient de créer un compte."
+#                 ,
+#                 action_status="non_lu",
+#                 type="admin_local_manquant"
+#             )
+#             db.add(notif)
+#           # 2. Création de l'étudiant 
+#         try:
+#             new_user = create_user(db, data)
+#         except Exception as e:
+#             # Gérer les erreurs de création si nécessaire (ex: validation de mot de passe)
+#             print(f"Erreur lors de la création de l'utilisateur: {e}")
+#             return {"error": "Erreur lors de la création du compte."}
+
+        
+#         db.commit() 
+#         db.refresh(new_user)
+#         return {
+#             "message": "Compte étudiant créé mais aucun admin local n'existe dans cette province.",
+#             "admin_local_missing": True,
+#             "user": new_user.email
+#         }
+
+#     # B.2: Succès complet (Admin local trouvé)
+    
+#     # 5. Si admin local trouvé → créer notification normale
+#     notif = Notification(
+#         user_id=admin_local.id,
+#         related_user_id=new_user.id,
+#         message=f"L'étudiant {new_user.prenom} {new_user.nom} s'est inscrit dans votre province.",
+#         action_status="non_lu",
+#         type="nouvelle_inscription"
+#     )
+#     db.add(notif)
+#     db.commit() # Commit la notification à l'admin local
+
+#     return {
+#         "message": "Compte étudiant créé avec succès.",
+#         "user": new_user.email
+#     }
+
 @router.post("/Etudiantregister")
 def register_etudiant(data: UserCreate, db: Session = Depends(get_db)):
     # Vérification email déjà utilisé
@@ -107,6 +177,7 @@ def register_etudiant(data: UserCreate, db: Session = Depends(get_db)):
         "message": "Compte étudiant créé avec succès.",
         "user": new_user.email
     }
+
 
 @router.post("/AdminLocalRegister")
 def register_admin_local(data: UserCreate, db: Session = Depends(get_db)):
@@ -183,6 +254,7 @@ def login(credentials: UserLogin,response: Response, db: Session = Depends(get_d
         "message": "Connexion réussie"
     }
  
+
 @router.get("/me")
 def get_current_user(request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get("token")
@@ -299,8 +371,6 @@ async def update_profile(
             "email": updated_user.email,
         },
     }
-
-
 
 
 @router.get("/notifications")

@@ -142,8 +142,6 @@ class Sujet(Base):
     # Relation vers les messages
     messages = relationship("Message", back_populates="sujet")
 
-
-
 class Message(Base):
     __tablename__ = "message"
 
