@@ -22,9 +22,17 @@ import os
 import urllib.parse
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import Dict, List
+import shutil
+import uuid
+from pathlib import Path
+from datetime import datetime, timezone
 
 
 router = APIRouter(prefix="/forum", tags=["Forum"])
+
+
+UPLOAD_DIR = "uploads/sujet"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 @router.post("/ajouter", response_model=MessageResponse)
@@ -85,14 +93,32 @@ async def create_sujet(
     try:
         # Gestion de l'image
         image_filename = None
+        # if image:
+        #     timestamp = int(datetime.now().timestamp())
+        #     ext = os.path.splitext(image.filename)[1]
+        #     image_filename = f"{timestamp}_{image.filename}"
+        #     file_path = os.path.join(UPLOAD_DIR, image_filename)
+        #     with open(file_path, "wb") as buffer:
+        #         shutil.copyfileobj(image.file, buffer)
+
         if image:
-            timestamp = int(datetime.now().timestamp())
-            ext = os.path.splitext(image.filename)[1]
-            image_filename = f"{timestamp}_{image.filename}"
-            file_path = os.path.join(UPLOAD_DIR, image_filename)
+            # Vérification optionnelle du type
+            if not (image.content_type and image.content_type.startswith("image/")):
+                raise HTTPException(status_code=400, detail="Le fichier doit être une image")
+
+            # Nom de fichier unique et sûr
+            ext = Path(image.filename).suffix or ".png"
+            safe_name = f"{int(datetime.now().timestamp())}_{uuid.uuid4().hex}{ext}"
+            file_path = os.path.join(UPLOAD_DIR, safe_name)
+
+            # Lire asynchrone et écrire
+            contents = await image.read()
             with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(image.file, buffer)
-        
+                buffer.write(contents)
+
+            # Stocke l'URL relative (pratique pour le frontend)
+            image_filename = f"/uploads/sujet/{safe_name}"
+
         new_sujet = Sujet(
             titre=titre,
             idCreateur=idCreateur,
