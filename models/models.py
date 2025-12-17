@@ -22,6 +22,7 @@ class User(Base):
     image = Column(String, nullable=True)
     statuts = Column(String, nullable=False)
     theme = Column(String, default="light")
+    date_creation = Column(DateTime, default=func.now(), nullable=False)
 
 
     # Ajouter la relation vers Notification
@@ -39,7 +40,6 @@ class Notification(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     type = Column(String, default="general")             # info / invitation
     related_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
-    #Modifier zao
     user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
 
 class Antenne(Base):
@@ -129,6 +129,7 @@ class Paiement(Base):
     livre = relationship("Livre", back_populates="paiements")
 
 
+
 class Sujet(Base):
     __tablename__ = "sujet"
 
@@ -139,15 +140,24 @@ class Sujet(Base):
     image = Column(String, nullable=True)
     province = Column(String)  
 
-    # Relation vers les messages
-    messages = relationship("Message", back_populates="sujet")
+    # Relation vers les messages (Ajout de la suppression en cascade)
+    messages = relationship(
+        "Message", 
+        back_populates="sujet",
+        cascade="all, delete-orphan" # ACTIVER LA SUPPRESSION EN CASCADE
+    )
 
 class Message(Base):
     __tablename__ = "message"
 
     idMessage = Column(Integer, primary_key=True, index=True)
     idSender = Column(Integer, ForeignKey("user.id"), nullable=False)
-    idSujet = Column(Integer, ForeignKey("sujet.idSujet"), nullable=False)
+    # Clé étrangère vers Sujet avec suppression en cascade au niveau de la DB
+    idSujet = Column(
+        Integer, 
+        ForeignKey("sujet.idSujet", ondelete="CASCADE"), 
+        nullable=False
+    )
     contenu = Column(String, nullable=False)
     fichier = Column(String, nullable=True)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
@@ -158,3 +168,17 @@ class Message(Base):
     parent = relationship("Message", remote_side=[idMessage], backref="reponses")
     
     sender = relationship("User", foreign_keys=[idSender])
+   
+class Historique(Base):
+    __tablename__ = "historique"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    id_acteur = Column(Integer, ForeignKey("user.id"), nullable=False)
+    action_type = Column(String, nullable=False)  # Ex: 'CREATION_ANTENNE', 'MODIF_LIVRE', etc.
+    description = Column(String, nullable=False)  # Description détaillée et lisible
+    target_id = Column(Integer, nullable=True)  # ID de l'entité affectée (Antenne, Formation, etc.)
+    role_visibility = Column(String, nullable=False)  # 'SUPER_ADMIN', 'ADMIN_LOCAL_SUPER', 'GLOBAL', 'USER'
+    date_creation = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relation vers l'utilisateur acteur
+    acteur = relationship("User", foreign_keys=[id_acteur])

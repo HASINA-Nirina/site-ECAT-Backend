@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from Controllers.formation_Controllers import (
     get_all_formations, create_formation, update_formation, delete_formation
@@ -6,7 +6,10 @@ from Controllers.formation_Controllers import (
 from schemas.user_schemas import FormationResponse,FormationCreate,FormationUpdate
 from Core.database import get_db
 import shutil, os
-from models.models import Formation 
+from models.models import Formation, User
+from Controllers.historique_controller import create_historique_for_super_admin
+from Core.config import SECRET_KEY, ALGORITHM
+import jwt 
 
 
 router = APIRouter(
@@ -16,6 +19,25 @@ router = APIRouter(
 UPLOAD_DIR = "uploads/formation"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+def get_current_user_from_request(request: Request, db: Session):
+    """Récupère l'utilisateur actuel depuis le token dans la requête."""
+    token = request.cookies.get("token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+        else:
+            return None
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_email = payload.get("sub")
+        if user_email:
+            return db.query(User).filter(User.email == user_email).first()
+    except:
+        pass
+    return None
+
 
 @router.get("/ReadFormation", response_model=list[FormationResponse])
 def list_formations(db: Session = Depends(get_db)):
@@ -24,6 +46,7 @@ def list_formations(db: Session = Depends(get_db)):
 
 @router.post("/NewFormation", response_model=FormationResponse)
 async def add_formation(
+    request: Request,
     titre: str = Form(...),
     description: str = Form(...),
     image: UploadFile | None = File(None),
@@ -54,18 +77,35 @@ async def add_formation(
         db.commit()
         db.refresh(new_form)
 
-        return FormationResponse(
-            idFormation=new_form.id,
+        result = FormationResponse(
+            idFormation=new_form.idFormation,
             titre=new_form.titre,
             description=new_form.description,
             image=new_form.image
         )
+        
+        # Enregistrer l'historique
+        current_user = get_current_user_from_request(request, db)
+        if current_user:
+            try:
+                create_historique_for_super_admin(
+                    db=db,
+                    id_acteur=current_user.id,
+                    action_type="CREATION_FORMATION",
+                    description=f"L'Admin Super {current_user.prenom} {current_user.nom} a créé la formation '{new_form.titre}'.",
+                    target_id=new_form.idFormation
+                )
+            except Exception as e:
+                print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+        
+        return result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/UpdateFormation/{id}", response_model=FormationResponse)
 async def edit_formation(
+    request: Request,
     id: int,
     titre: str = Form(...),
     description: str = Form(...),
@@ -98,22 +138,57 @@ async def edit_formation(
         db.commit()
         db.refresh(form)
 
-        return FormationResponse(
+        result = FormationResponse(
             idFormation=form.idFormation,
             titre=form.titre,
             description=form.description,
             image=form.image
         )
+        
+        # Enregistrer l'historique
+        current_user = get_current_user_from_request(request, db)
+        if current_user:
+            try:
+                create_historique_for_super_admin(
+                    db=db,
+                    id_acteur=current_user.id,
+                    action_type="MODIF_FORMATION",
+                    description=f"L'Admin Super {current_user.prenom} {current_user.nom} a modifié la formation '{form.titre}'.",
+                    target_id=form.idFormation
+                )
+            except Exception as e:
+                print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+        
+        return result
 
     except Exception as e:
         raise HTTPException(500, str(e))
 
 
 @router.delete("/DeleteFormation/{id}")
-def remove_formation(id: int, db: Session = Depends(get_db)):
+def remove_formation(request: Request, id: int, db: Session = Depends(get_db)):
+    # Récupérer la formation avant suppression pour l'historique
+    form_to_delete = db.query(Formation).filter(Formation.idFormation == id).first()
+    formation_title = form_to_delete.titre if form_to_delete else "Inconnue"
+    
     result = delete_formation(db, id)
     if not result:
         raise HTTPException(404, "Formation non trouvée")
+    
+    # Enregistrer l'historique
+    current_user = get_current_user_from_request(request, db)
+    if current_user and form_to_delete:
+        try:
+            create_historique_for_super_admin(
+                db=db,
+                id_acteur=current_user.id,
+                action_type="SUPPR_FORMATION",
+                description=f"L'Admin Super {current_user.prenom} {current_user.nom} a supprimé la formation '{formation_title}'.",
+                target_id=id
+            )
+        except Exception as e:
+            print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+    
     return {"message": "Formation supprimée avec succès"}
 
 

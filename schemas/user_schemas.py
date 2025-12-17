@@ -185,13 +185,18 @@ class SujetOut(BaseModel):
     image: str | None = None
     messages: List[MessageOut] = []
 
+
+    # nouveau champ
 class SujetResponse(BaseModel):
     idSujet: int
     titre: str
-    idCreateur: int
+    image: str | None = None  
     date_creation: datetime
-    image: str | None = None  # nouveau champ
-
+    isCreator: Optional[bool] = None 
+    class Config:
+        orm_mode = True
+        from_attributes = True
+   
 class SenderSchema(BaseModel):
     id: int
     nom: str
@@ -246,5 +251,31 @@ class AntenneOut(AntenneBase):
 
     class Config:
         orm_mode = True
+
+###################Historique################
+class HistoriqueBase(BaseModel):
+    id_acteur: int
+    action_type: str
+    description: str
+    target_id: Optional[int] = None
+    role_visibility: str  # 'SUPER_ADMIN', 'ADMIN_LOCAL_SUPER', 'GLOBAL', 'USER'
+
+class HistoriqueCreate(HistoriqueBase):
+    pass
+
+class HistoriqueResponse(BaseModel):
+    id: int
+    id_acteur: int
+    action_type: str
+    description: str
+    target_id: Optional[int] = None
+    role_visibility: str
+    date_creation: datetime
+    acteur_nom: Optional[str] = None
+    acteur_prenom: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 

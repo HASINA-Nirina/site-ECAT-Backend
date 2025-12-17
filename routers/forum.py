@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from Core.database import get_db
@@ -6,12 +6,17 @@ from Controllers.forum_contronllers import get_user_details,ajouter_message, get
 from schemas.user_schemas import MessageCreate,SujetOut,SujetResponse,MessageResponse
 from models.models import Message,Sujet, User
 from typing import List, Optional, Union
-from .auth import get_current_user 
+from .auth import get_current_user
+from Controllers.historique_controller import create_historique_global
+from Core.config import SECRET_KEY, ALGORITHM
+import jwt 
 from datetime import datetime, timezone
 from fastapi import File, UploadFile, Form
 from typing import Optional
 import os
 import time
+import shutil
+
 from fastapi import APIRouter, Form, File, UploadFile, Depends
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -64,24 +69,31 @@ def read_sujet_by_user(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
-    sujets = []
-    # ROLE : ADMIN
+    # Récupération selon role
     if user.role.lower() == "admin":
         sujets = db.query(Sujet).filter(
             Sujet.province.in_(["admin", "public"])
         ).order_by(Sujet.date_creation.desc()).all()
-    # ROLE : ADMIN LOCAL
+
     elif user.role.lower() == "admin local":
         sujets = db.query(Sujet).filter(
             Sujet.province.in_(["admin", "public", user.province])
         ).order_by(Sujet.date_creation.desc()).all()
-    # ROLE : ETUDIANT
-    else:
+
+    else:  # étudiant
         sujets = db.query(Sujet).filter(
             Sujet.province.in_(["public", user.province])
         ).order_by(Sujet.date_creation.desc()).all()
 
-    return sujets
+    # Ajouter isCreator
+    result = []
+    for sujet in sujets:
+        sujet_dict = SujetResponse.from_orm(sujet).dict()
+        sujet_dict["isCreator"] = (sujet.idCreateur == idUser)
+        result.append(sujet_dict)
+
+    return result
+
 
 @router.post("/NewSujet")
 async def create_sujet(
@@ -100,8 +112,7 @@ async def create_sujet(
         #     file_path = os.path.join(UPLOAD_DIR, image_filename)
         #     with open(file_path, "wb") as buffer:
         #         shutil.copyfileobj(image.file, buffer)
-
-        if image:
+      if image:
             # Vérification optionnelle du type
             if not (image.content_type and image.content_type.startswith("image/")):
                 raise HTTPException(status_code=400, detail="Le fichier doit être une image")
@@ -129,10 +140,127 @@ async def create_sujet(
         db.add(new_sujet)
         db.commit()
         db.refresh(new_sujet)
+        
+        # Enregistrer l'historique
+        createur = db.query(User).filter(User.id == idCreateur).first()
+        if createur:
+            try:
+                create_historique_global(
+                    db=db,
+                    id_acteur=idCreateur,
+                    action_type="CREATION_SUJET",
+                    description=f"L'utilisateur {createur.prenom} {createur.nom} a créé un nouveau sujet : {titre}.",
+                    target_id=new_sujet.idSujet
+                )
+            except Exception as e:
+                print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+        
         return new_sujet
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/UpdateSujet/{id}")
+async def update_sujet(
+    id: int,
+    titre: str = Form(...),
+    idCreateur: int = Form(...),
+    image: UploadFile | None = File(None),
+    db: Session = Depends(get_db)
+):
+    try:
+        sujet = db.query(Sujet).filter(Sujet.idSujet == id).first()
+        if not sujet:
+            raise HTTPException(status_code=404, detail="Sujet introuvable")
+
+        # Dossier des images
+        UPLOAD_DIR = "uploads/forum"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+        old_image = sujet.image
+
+        # Si une nouvelle image est envoyée → remplacer
+        if image:
+            timestamp = int(datetime.now().timestamp())
+            ext = os.path.splitext(image.filename)[1]
+            new_filename = f"{timestamp}_{image.filename}"
+            file_path = os.path.join(UPLOAD_DIR, new_filename)
+
+            # Enregistrer nouvelle image
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+
+            sujet.image = new_filename
+
+            # Supprimer ancienne image si elle existe
+            if old_image:
+                old_path = os.path.join(UPLOAD_DIR, old_image)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+
+        # Mise à jour du titre
+        sujet.titre = titre
+
+        db.commit()
+        db.refresh(sujet)
+
+        # Historique
+        try:
+            create_historique_global(
+                db=db,
+                id_acteur=idCreateur,
+                action_type="MODIFICATION_SUJET",
+                description=f"L'utilisateur ID {idCreateur} a modifié le sujet : {titre}.",
+                target_id=sujet.idSujet
+            )
+        except Exception as e:
+            print(f"Erreur lors de l'historique update: {e}")
+
+        return sujet
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/DeleteSujet/{id}")
+async def delete_sujet(
+    id: int,
+    idCreateur: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        sujet = db.query(Sujet).filter(Sujet.idSujet == id).first()
+        if not sujet:
+            raise HTTPException(status_code=404, detail="Sujet introuvable")
+
+        # Supprimer l'image associée si existe
+        if sujet.image:
+            image_path = os.path.join("uploads/forum", sujet.image)
+            if os.path.exists(image_path):
+                os.remove(image_path)
+
+        # Supprimer le sujet
+        db.delete(sujet)
+        db.commit()
+
+        # Historique
+        try:
+            create_historique_global(
+                db=db,
+                id_acteur=idCreateur,
+                action_type="SUPPRESSION_SUJET",
+                description=f"L'utilisateur ID {idCreateur} a supprimé un sujet : {sujet.titre}.",
+                target_id=id
+            )
+        except Exception as e:
+            print(f"Erreur lors de l'historique delete: {e}")
+
+        return {"message": "Sujet supprimé avec succès"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/{idSujet}", response_model=SujetOut)
 def show_sujet(idSujet: int, db: Session = Depends(get_db)):

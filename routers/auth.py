@@ -18,6 +18,12 @@ from Controllers.user_controllers import (
     sync_and_get_antennes,
     get_stats_by_antenne,
 )
+from Controllers.historique_controller import (
+    create_historique_for_super_admin,
+    create_historique_for_admin_local_super,
+    create_historique_global,
+    create_historique_user,
+)
 from Core.config import SECRET_KEY, ALGORITHM
 from models.models import Notification, User, Sujet, Antenne
 from dependencies import get_current_user
@@ -372,6 +378,18 @@ async def update_profile(
     updated_user = db.query(User).filter(User.id == user.id).first()
     image_url = f"http://localhost:8000{updated_user.image}" if updated_user.image else None
 
+    # Enregistrer l'historique (modification de profil par l'utilisateur lui-même)
+    try:
+        create_historique_user(
+            db=db,
+            id_acteur=user.id,
+            action_type="MODIF_PROFIL_USER",
+            description=f"L'utilisateur {updated_user.prenom} {updated_user.nom} a modifié son profil (nom, prénom ou photo).",
+            target_id=user.id
+        )
+    except Exception as e:
+        print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+
     return {
         "message": "Profil mis à jour avec succès",
         "user": {
@@ -443,8 +461,23 @@ def accepter_invitation(notif_id: int, db: Session = Depends(get_db), request: R
     admin_local = db.query(User).filter(User.id == notif.related_user_id).first()
     if admin_local:
         admin_local.statuts = "Actif"
-
-    db.commit()
+        db.commit()
+        
+        # Enregistrer l'historique
+        try:
+            create_historique_for_super_admin(
+                db=db,
+                id_acteur=super_admin.id,
+                action_type="ADMIN_ACCEPT",
+                description=f"L'Admin Super {super_admin.prenom} {super_admin.nom} a accepté l'utilisateur {admin_local.prenom} {admin_local.nom} comme Admin Local.",
+                target_id=admin_local.id
+            )
+        except Exception as e:
+            # Ne pas faire échouer la requête si l'historique échoue
+            print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+    else:
+        db.commit()
+    
     return {"message": "Invitation acceptée et compte activé."}
 
 
@@ -477,8 +510,24 @@ def refuser_invitation(notif_id: int, db: Session = Depends(get_db), request: Re
     admin_local = db.query(User).filter(User.id == notif.related_user_id).first()
     if admin_local:
         admin_local.statuts = "refuser"
-
-    db.commit()
+        db.commit()
+        
+        # Enregistrer l'historique
+        
+        try:
+            create_historique_for_super_admin(
+                db=db,
+                id_acteur=super_admin.id,
+                action_type="ADMIN_REJECT",
+                description=f"L'Admin Super {super_admin.prenom} {super_admin.nom} a refusé l'utilisateur {admin_local.prenom} {admin_local.nom} comme Admin Local.",
+                target_id=admin_local.id
+            )
+        except Exception as e:
+            # Ne pas faire échouer la requête si l'historique échoue
+            print(f"Erreur lors de l'enregistrement de l'historique: {e}")
+    else:
+        db.commit()
+    
     return {"message": "Invitation refusée et compte bloqué."}
 
 
