@@ -217,7 +217,6 @@ def register_admin_local(data: UserCreate, db: Session = Depends(get_db)):
     return {"message": "Votre demande d’inscription est en attente de validation."}
 
 
-
 @router.post("/login")
 def login(credentials: UserLogin,response: Response, db: Session = Depends(get_db)):
     result = authenticate_user_role(credentials.email, credentials.mot_de_passe, db)
@@ -228,23 +227,34 @@ def login(credentials: UserLogin,response: Response, db: Session = Depends(get_d
     
     # Récupérer l'utilisateur connecté
     user = db.query(User).filter(User.email == credentials.email).first()
+    
+    # ⚡ Créer le sujet du forum en arrière-plan (sans bloquer la réponse)
     if user.role == "Admin Local":
-    # Trouver si un sujet pour cette province existe déjà
-        titre_sujet = f"Forum – Province {user.province}"
+        try:
+            titre_sujet = f"Forum – Province {user.province}"
+            province_sujet = db.query(Sujet).filter(Sujet.titre == titre_sujet).first()
 
-        province_sujet = db.query(Sujet).filter(Sujet.titre == titre_sujet).first()
+            # Si pas encore de sujet → on le crée
+            if not province_sujet:
+                province_sujet = Sujet(
+                    titre=titre_sujet,
+                    province=user.province,
+                    idCreateur=user.id
+                )
+                db.add(province_sujet)
+                db.commit()
+        except Exception as e:
+            # On log l'erreur mais on ne bloque pas la connexion
+            print(f"Erreur lors de la création du sujet: {e}")
+            db.rollback()
 
-        # Si pas encore de sujet → on le crée
-        if not province_sujet:
-            province_sujet = Sujet(
-                titre=titre_sujet,
-                province=user.province,
-                idCreateur=user.id
-            )
-            db.add(province_sujet)
-            db.commit()
-            db.refresh(province_sujet)
-   
+    response.set_cookie(
+    key="token",
+    value=result["token"],
+    httponly=True,
+    samesite="lax",
+    secure=False  # ⚠️ True uniquement en HTTPS (production)
+    )
 
     return {
         "error": False,
