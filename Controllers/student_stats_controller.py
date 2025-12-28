@@ -30,12 +30,12 @@ def get_student_dashboard_stats(db: Session, current_user: User) -> Dict:
         .count()
     )
     
-    # 2. Paiements : Nombre total de Paiements avec status SUCCESSFUL
+    # 2. Paiements : Nombre total de Paiements avec status SUCCESS
     paiements_count = (
         db.query(Paiement)
         .filter(
             Paiement.idUtilisateur == user_id,
-            Paiement.status == PaymentStatus.SUCCESSFUL
+            Paiement.status == PaymentStatus.SUCCESS
         )
         .count()
     )
@@ -73,7 +73,7 @@ def get_student_dashboard_stats(db: Session, current_user: User) -> Dict:
         )
         .filter(
             Paiement.idUtilisateur == user_id,
-            Paiement.status == PaymentStatus.SUCCESSFUL,
+            Paiement.status == PaymentStatus.SUCCESS,
             Paiement.date_creation >= six_mois_avant
         )
         .group_by(

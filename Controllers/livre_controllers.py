@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException
-from models.models import Livre,UserLivreAccess
-from schemas.user_schemas import LivreCreate, LivreUpdate, LivreDebloque
+from models.models import Livre,UserLivreAccess,Paiement
+from schemas.user_schemas import LivreCreate, LivreUpdate, LivreDebloque, PaymentStatus
 from sqlalchemy.orm import Session
 import shutil
 import os
@@ -147,15 +147,38 @@ def delete_livre_controller(db: Session, livre_id: int):
     return {"message": "Livre supprimé avec succès"}
 
 def debloque_livre(db: Session, data: LivreDebloque):
+    # 1. Création de l'accès au livre
     db_access = UserLivreAccess(
         idUser=data.idUser,
         idLivre=data.idLivre,
         canAccess=True
     )
     db.add(db_access)
-    db.commit()
-    db.refresh(db_access)
-    return db_access
+
+    # 2. Création de l'enregistrement de paiement
+    db_paiement = Paiement(
+        idUtilisateur=data.idUser,
+        idLivre=data.idLivre,
+        contact=data.contact,
+        montant=data.montant,
+        operateur=data.operateur,
+        reference=data.reference, 
+        status=PaymentStatus.SUCCESS.value
+        #  PENDING = "PENDING"
+   # SUCCESS = "SUCCESS"
+  #  FAILED = "FAILED"
+
+    )
+    db.add(db_paiement)
+
+    # 3. Validation finale
+    try:
+        db.commit()
+        db.refresh(db_access)
+        return db_access
+    except Exception as e:
+        db.rollback() # Annule tout en cas d'erreur (ex: référence déjà existante)
+        raise e
 
 def check_user_livre_access(db: Session, iduser: int, idlivre: int) -> bool:
     access = db.query(UserLivreAccess)\

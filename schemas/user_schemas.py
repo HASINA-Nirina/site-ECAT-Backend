@@ -109,11 +109,10 @@ class PasswordVerify(BaseModel):
     mot_de_passe: str 
 
 #########################Paiement################################
-class PaymentStatus(str, Enum):
+class PaymentStatus(Enum):
     PENDING = "PENDING"
-    SUCCESSFUL = "SUCCESSFUL"
+    SUCCESS = "SUCCESS"
     FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
 
 class PaiementResponse(BaseModel):
     idPaiement: int
@@ -160,7 +159,11 @@ class LivreRead(BaseModel):
 class LivreDebloque(BaseModel):
     idUser: int
     idLivre: int
-    canAccess: bool
+    contact: str  
+    montant: float
+    operateur: str 
+    reference: str 
+    canAccess: bool = True
 
 class UserLivreAccessCheck(BaseModel):
     idUser: int

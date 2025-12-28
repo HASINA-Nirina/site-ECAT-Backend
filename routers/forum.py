@@ -94,7 +94,6 @@ def read_sujet_by_user(
 
     return result
 
-
 @router.post("/NewSujet")
 async def create_sujet(
     titre: str = Form(...),
@@ -105,29 +104,21 @@ async def create_sujet(
     try:
         # Gestion de l'image
         image_filename = None
-        # if image:
-        #     timestamp = int(datetime.now().timestamp())
-        #     ext = os.path.splitext(image.filename)[1]
-        #     image_filename = f"{timestamp}_{image.filename}"
-        #     file_path = os.path.join(UPLOAD_DIR, image_filename)
-        #     with open(file_path, "wb") as buffer:
-        #         shutil.copyfileobj(image.file, buffer)
-      if image:
-            # Vérification optionnelle du type
+
+        if image:
+            # Vérification du type
             if not (image.content_type and image.content_type.startswith("image/")):
                 raise HTTPException(status_code=400, detail="Le fichier doit être une image")
 
-            # Nom de fichier unique et sûr
+            # Nom de fichier unique
             ext = Path(image.filename).suffix or ".png"
             safe_name = f"{int(datetime.now().timestamp())}_{uuid.uuid4().hex}{ext}"
             file_path = os.path.join(UPLOAD_DIR, safe_name)
 
-            # Lire asynchrone et écrire
             contents = await image.read()
             with open(file_path, "wb") as buffer:
                 buffer.write(contents)
 
-            # Stocke l'URL relative (pratique pour le frontend)
             image_filename = f"/uploads/sujet/{safe_name}"
 
         new_sujet = Sujet(
@@ -137,11 +128,12 @@ async def create_sujet(
             province="public",
             date_creation=datetime.now(timezone.utc)
         )
+
         db.add(new_sujet)
         db.commit()
         db.refresh(new_sujet)
-        
-        # Enregistrer l'historique
+
+        # Historique
         createur = db.query(User).filter(User.id == idCreateur).first()
         if createur:
             try:
@@ -153,9 +145,10 @@ async def create_sujet(
                     target_id=new_sujet.idSujet
                 )
             except Exception as e:
-                print(f"Erreur lors de l'enregistrement de l'historique: {e}")
-        
+                print(f"Erreur historique : {e}")
+
         return new_sujet
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
