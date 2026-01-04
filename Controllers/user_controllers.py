@@ -19,13 +19,21 @@ def create_user(db: Session, user: UserCreate):
     """
     Crée un utilisateur dans la table `user`.
     Pour Admin Local, le statut sera 'en attente'.
+    L'antenne est déterminée à partir de la province.
     """
+
+    # 1️⃣ Vérifier si l'email existe déjà
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
-        raise HTTPException(status_code=400, detail="Cet e-mail est déjà utilisé.")
+        raise HTTPException(
+            status_code=400,
+            detail="Cet e-mail est déjà utilisé."
+        )
 
-    hashed_password = hash_password (user.mot_de_passe)
+    # 2️⃣ Hasher le mot de passe
+    hashed_password = hash_password(user.mot_de_passe)
 
+    # 3️⃣ Déterminer le statut initial selon le rôle
     role_lower = user.role.lower()
     if role_lower == "admin local":
         statut_initial = "en attente"
@@ -34,6 +42,22 @@ def create_user(db: Session, user: UserCreate):
     else:
         statut_initial = "en attente"
 
+    # 4️⃣ Rechercher l'antenne correspondant à la province
+    antenne = None
+    if user.province:
+        antenne = (
+            db.query(Antenne)
+            .filter(Antenne.province == user.province)
+            .first()
+        )
+
+        if antenne is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Aucune antenne trouvée pour cette province."
+            )
+
+    # 5️⃣ Création de l'utilisateur
     db_user = User(
         nom=user.nom,
         prenom=user.prenom,
@@ -41,15 +65,16 @@ def create_user(db: Session, user: UserCreate):
         mot_de_passe=hashed_password,
         province=user.province,
         role=user.role,
-        statuts=statut_initial
+        statuts=statut_initial,
+        antenne_id=antenne.id if antenne else None
     )
 
+    # 6️⃣ Sauvegarde en base
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
     return db_user
-
-
 def authenticate_user_role(email: str, password: str, db: Session):
     user = db.query(User).filter(User.email == email).first()
 

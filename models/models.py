@@ -81,6 +81,7 @@ class Livre(Base):
     image = Column(String, nullable=True)
     prix = Column(Float, nullable=False)
     description = Column(String, nullable=True)
+    province = Column(String, nullable=True)
 
     paiements = relationship(
     "Paiement",

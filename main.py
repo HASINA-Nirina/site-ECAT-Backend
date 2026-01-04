@@ -2,7 +2,8 @@ import sys, os
 sys.path.append(os.path.dirname(__file__))
 
 from fastapi import FastAPI
-from routers import auth, formation, paiement, livre, forum, antenne, stats, student, rapports 
+from routers import auth, formation, paiement, livre, forum, antenne, stats, student, rapports
+from routers import dashboard_router 
 from Core.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -10,7 +11,9 @@ from Core.database import SessionLocal
 from models.models import User, Sujet
 from Core.security import hash_password
 from fastapi.staticfiles import StaticFiles
-
+import os
+# En production, vous définirez cette variable sur votre serveur
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 Base.metadata.create_all(bind=engine, checkfirst=True)
 
@@ -112,6 +115,7 @@ app.include_router(antenne.router)
 app.include_router(stats.router)
 app.include_router(student.router)
 app.include_router(rapports.router)
+app.include_router(dashboard_router.router)
 
 # --- Pour servir les images uploadées ---
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")

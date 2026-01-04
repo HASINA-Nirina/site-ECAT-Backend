@@ -4,9 +4,10 @@ from Core.database import get_db
 from schemas.user_schemas import AntenneCreate, AntenneUpdate, AntenneOut
 from Controllers.antenne_controller import create_antenne,get_all_antennes,get_antenne_by_id,update_antenne,delete_antenne
 from Controllers.historique_controller import create_historique_for_super_admin
-from models.models import User
+from models.models import User,Sujet
 from Core.config import SECRET_KEY, ALGORITHM
 import jwt
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/antenne", tags=["Antenne"])
 
@@ -31,23 +32,50 @@ def get_current_user_from_request(request: Request, db: Session):
 
 @router.post("/NewAntenne", response_model=AntenneOut)
 def create_antenne_route(antenne: AntenneCreate, request: Request, db: Session = Depends(get_db)):
-    new_antenne = create_antenne(db, antenne)
-    
-    # Enregistrer l'historique
-    current_user = get_current_user_from_request(request, db)
-    if current_user:
-        try:
+    try:
+        # 1. Création de l'antenne en base de données
+        new_antenne = create_antenne(db, antenne)
+        
+        # 2. Récupération de l'utilisateur actuel pour l'historique et le forum
+        current_user = get_current_user_from_request(request, db)
+        creator_id = current_user.id if current_user else 1 # ID 1 ou 0 par défaut si pas de user
+
+        # 3. Création automatique du Sujet de Forum pour cette province
+        titre_sujet = f"Forum – Province {new_antenne.province}"
+        
+        # Vérification si le forum existe déjà pour éviter les doublons
+        forum_exists = db.query(Sujet).filter(Sujet.titre == titre_sujet).first()
+        
+        if not forum_exists:
+            nouveau_sujet = Sujet(
+                titre=titre_sujet,
+                province=new_antenne.province,
+                idCreateur=creator_id,
+                date_creation=datetime.now(timezone.utc)
+            )
+            db.add(nouveau_sujet)
+            # Pas besoin de commit ici, on attend la fin de la route
+
+        # 4. Enregistrement dans l'historique (si l'utilisateur est connecté)
+        if current_user:
             create_historique_for_super_admin(
                 db=db,
                 id_acteur=current_user.id,
                 action_type="CREATION_ANTENNE",
-                description=f"L'Admin Super {current_user.prenom} {current_user.nom} a créé l'antenne {new_antenne.province}.",
+                description=f"L'Admin Super {current_user.prenom} {current_user.nom} a créé l'antenne {new_antenne.province} et son forum.",
                 target_id=new_antenne.id
             )
-        except Exception as e:
-            print(f"Erreur lors de l'enregistrement de l'historique: {e}")
-    
-    return new_antenne
+
+        # 5. UN SEUL COMMIT pour valider toute l'opération (Antenne + Forum + Historique)
+        db.commit()
+        db.refresh(new_antenne)
+        
+        return new_antenne
+
+    except Exception as e:
+        db.rollback() # En cas d'erreur, on annule tout (évite de créer l'antenne sans le forum)
+        print(f"Erreur lors de la création complète de l'antenne: {e}")
+        raise HTTPException(status_code=500, detail="Erreur interne lors de la création")
 
 @router.get("/ReadAntenne", response_model=list[AntenneOut])
 def list_antennes_route(db: Session = Depends(get_db)):

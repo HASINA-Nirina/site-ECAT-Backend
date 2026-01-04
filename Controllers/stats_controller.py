@@ -37,7 +37,7 @@ def get_dashboard_stats(db: Session, current_user: User) -> Dict:
         .join(User, Paiement.idUtilisateur == User.id)
         .filter(
             User.province == province,
-            Paiement.status == PaymentStatus.SUCCESSFUL
+            Paiement.status == PaymentStatus.SUCCESS
         )
         .scalar()
     ) or 0.0
@@ -105,7 +105,7 @@ def get_dashboard_stats(db: Session, current_user: User) -> Dict:
         # Traduire les labels
         label_map = {
             "PENDING": "En attente",
-            "SUCCESSFUL": "Validé",
+            "SUCCESS": "Validé",
             "FAILED": "Échoué",
             "CANCELLED": "Annulé"
         }

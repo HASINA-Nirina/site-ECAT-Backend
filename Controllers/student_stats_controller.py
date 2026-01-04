@@ -13,6 +13,7 @@ def get_student_dashboard_stats(db: Session, current_user: User) -> Dict:
     """
     
     # Vérifier que l'utilisateur est un étudiant
+    # Note : Assurez-vous que le rôle en base est bien "etudiante" (ou "etudiant")
     if current_user.role != "etudiante":
         raise HTTPException(status_code=403, detail="Accès réservé aux étudiants.")
     
@@ -54,17 +55,7 @@ def get_student_dashboard_stats(db: Session, current_user: User) -> Dict:
     # 4. Historique : Nombre de livres débloqués par mois sur les 6 derniers mois
     six_mois_avant = datetime.now() - timedelta(days=180)
     
-    # Récupérer tous les accès aux livres de l'étudiant créés dans les 6 derniers mois
-    # Note: UserLivreAccess n'a pas de date_creation visible dans le modèle
-    # On va utiliser la date_creation du paiement associé comme proxy, ou créer une logique alternative
-    
-    # Si UserLivreAccess n'a pas de date, on peut utiliser la date du paiement associé
-    # Sinon, on peut utiliser une approximation basée sur l'ID ou une autre logique
-    
-    # Pour l'instant, utilisons une approche basée sur les paiements validés qui débloquent des livres
-    # Les livres sont débloqués quand un paiement est validé, donc on peut utiliser la date du paiement
-    
-    # Récupérer les paiements validés avec leurs dates
+    # Récupérer les paiements validés avec leurs dates (groupés par année/mois)
     paiements_valides = (
         db.query(
             extract('year', Paiement.date_creation).label('year'),
@@ -86,10 +77,12 @@ def get_student_dashboard_stats(db: Session, current_user: User) -> Dict:
     # Construire un dictionnaire mois -> nombre de livres
     mois_counts = {}
     for year, month, count in paiements_valides:
-        mois_key = f"{year}-{month:02d}"
+        # --- CORRECTION ICI ---
+        # On convertit explicitement year et month en int() car extract retourne des float
+        mois_key = f"{int(year)}-{int(month):02d}"
         mois_counts[mois_key] = count
     
-    # Construire l'historique pour les 6 derniers mois
+    # Construire l'historique final pour les 6 derniers mois (pour le graphe frontend)
     historique = []
     for i in range(5, -1, -1):  # 6 derniers mois (5, 4, 3, 2, 1, 0)
         date_reference = datetime.now() - timedelta(days=30 * i)
@@ -98,7 +91,7 @@ def get_student_dashboard_stats(db: Session, current_user: User) -> Dict:
         # Nombre de livres débloqués ce mois (via paiements)
         livres_ce_mois = mois_counts.get(mois_key, 0)
         
-        # Format court du mois
+        # Format court du mois (Jan, Feb, etc.)
         mois_short = date_reference.strftime("%b")
         
         historique.append({
@@ -112,4 +105,3 @@ def get_student_dashboard_stats(db: Session, current_user: User) -> Dict:
         "livres": livres_count,
         "historique": historique
     }
-

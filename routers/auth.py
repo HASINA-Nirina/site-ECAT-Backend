@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form, Request,Response
 from sqlalchemy.orm import Session
+from fastapi import BackgroundTasks
 from Core.database import get_db
 import jwt, os, shutil
 from Controllers.user_controllers import (
@@ -36,7 +37,7 @@ from jwt.exceptions import ExpiredSignatureError
 from typing import List
 from fastapi import Depends
 
-
+BACKEND_URL = os.getenv("BACKEND_URL")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -223,53 +224,69 @@ def register_admin_local(data: UserCreate, db: Session = Depends(get_db)):
     return {"message": "Votre demande d’inscription est en attente de validation."}
 
 
+
+
+# Fonction utilitaire pour la tâche de fond
+def create_province_forum(user_id: int, province_name: str, db_session_factory):
+    db = db_session_factory()
+    try:
+        titre_sujet = f"Forum – Province {province_name}"
+        # On vérifie si le sujet existe
+        exists = db.query(Sujet).filter(Sujet.titre == titre_sujet).first()
+        if not exists:
+            nouveau_sujet = Sujet(
+                titre=titre_sujet,
+                province=province_name,
+                idCreateur=user_id
+            )
+            db.add(nouveau_sujet)
+            db.commit()
+    except Exception as e:
+        print(f"Erreur arrière-plan forum: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
 @router.post("/login")
-def login(credentials: UserLogin,response: Response, db: Session = Depends(get_db)):
+def login(
+    credentials: UserLogin, 
+    response: Response, 
+    background_tasks: BackgroundTasks, 
+    db: Session = Depends(get_db)
+):
     result = authenticate_user_role(credentials.email, credentials.mot_de_passe, db)
 
-    # Si authenticate_user_role retourne une erreur structurée
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=400, detail=result.get("message"))
     
-    # Récupérer l'utilisateur connecté
     user = db.query(User).filter(User.email == credentials.email).first()
-    
-    # ⚡ Créer le sujet du forum en arrière-plan (sans bloquer la réponse)
-    if user.role == "Admin Local":
-        try:
-            titre_sujet = f"Forum – Province {user.province}"
-            province_sujet = db.query(Sujet).filter(Sujet.titre == titre_sujet).first()
+    if not user:
+         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
-            # Si pas encore de sujet → on le crée
-            if not province_sujet:
-                province_sujet = Sujet(
-                    titre=titre_sujet,
-                    province=user.province,
-                    idCreateur=user.id
-                )
-                db.add(province_sujet)
-                db.commit()
-        except Exception as e:
-            # On log l'erreur mais on ne bloque pas la connexion
-            print(f"Erreur lors de la création du sujet: {e}")
-            db.rollback()
+    # On sauvegarde les infos nécessaires avant tout commit
+    user_province = user.province
+    user_id = user.id
+
+    # ⚡ On délègue la création du forum à une tâche de fond
+    if result["role"] == "Admin Local" and user_province:
+        # On passe get_db (la factory) pour créer une nouvelle session propre en tâche de fond
+        background_tasks.add_task(create_province_forum, user_id, user_province, get_db)
 
     response.set_cookie(
-    key="token",
-    value=result["token"],
-    httponly=True,
-    samesite="lax",
-    secure=False  # ⚠️ True uniquement en HTTPS (production)
+        key="token",
+        value=result["token"],
+        httponly=True,
+        samesite="lax",
+        secure=True  # Mettre à True en HTTPS (Production)
     )
 
     return {
         "error": False,
         "token": result["token"],
         "role": result["role"],
-        "province": user.province,
+        "province": user_province,
         "message": "Connexion réussie"
     }
- 
 
 @router.get("/me")
 def get_current_user(request: Request, db: Session = Depends(get_db)):
@@ -284,8 +301,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         user = db.query(User).filter(User.email == user_email).first()
         if not user:
             raise HTTPException(status_code=404, detail="Utilisateur introuvable")
-
-        image_url = f"http://localhost:8000{user.image}" if user.image else None
+        
 
         return {
             "id": user.id,
@@ -293,7 +309,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
             "prenom": user.prenom,
             "role": user.role,
             "email": user.email,
-            "image": image_url,
+            "image": user.image,
             "theme": user.theme,
             "province": user.province,
         }
@@ -376,9 +392,6 @@ async def update_profile(
 
     # Récupérer les infos à jour
     updated_user = db.query(User).filter(User.id == user.id).first()
-    image_url = f"http://localhost:8000{updated_user.image}" if updated_user.image else None
-
-    # Enregistrer l'historique (modification de profil par l'utilisateur lui-même)
     try:
         create_historique_user(
             db=db,
@@ -395,7 +408,7 @@ async def update_profile(
         "user": {
             "prenom": updated_user.prenom,
             "nom": updated_user.nom,
-            "image": image_url,
+            "image": updated_user.image,
             "email": updated_user.email,
         },
     }
