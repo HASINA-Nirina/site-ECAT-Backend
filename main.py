@@ -1,115 +1,118 @@
-import sys, os
+import os
+import sys
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+
+# Fix import path
 sys.path.append(os.path.dirname(__file__))
 
-from fastapi import FastAPI
-from routers import auth, formation, paiement, livre, forum, antenne, stats, student, rapports
-from routers import dashboard_router 
-from Core.database import Base, engine
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from Core.database import SessionLocal
-from models.models import User, Sujet
+# Imports internes
+from Core.database import Base, engine, SessionLocal
 from Core.security import hash_password
-from fastapi.staticfiles import StaticFiles
-import os
-# En production, vous définirez cette variable sur votre serveur
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+from models.models import User, Sujet
 
-Base.metadata.create_all(bind=engine, checkfirst=True)
+from routers import (
+    auth,
+    formation,
+    paiement,
+    livre,
+    forum,
+    antenne,
+    stats,
+    student,
+    rapports,
+    dashboard_router,
+)
 
+# ======================================================
+# CONFIG APP
+# ======================================================
 
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+app = FastAPI(
+    title="ECAT Backend API",
+    version="1.0.0",
+)
 
-    db: Session = SessionLocal()
-    try:
-        # --- Création de l'admin super si nécessaire ---
-        admin_email = "jeandedieuhasinirina82@gmail.com"
-        admin = db.query(User).filter(User.email == admin_email).first()
-        if not admin:
-            hashed_pw = hash_password("admin123")
-            admin_user = User(
-            nom="Admin",
-            prenom="Principal",
-            email=admin_email,
-            mot_de_passe=hashed_pw,
-            role="admin",
-            province=None,
-            statuts="Actif")
+# ======================================================
+# CORS (DOIT ÊTRE ICI, AVANT TOUT)
+# ======================================================
 
-            hashed_pw = hash_password("uy:/p1hvfhasinaC")
-            admin_user = User(
-                nom="HASINIRINA",
-                prenom="Yannick",
-                email=admin_email,
-                mot_de_passe=hashed_pw,
-                role="admin",
-                province="Fianarantsoa",
-                image=None,
-                statuts="Actif",
-                theme="light",)
-            
-            db.add(admin_user)
-            db.commit()
-            db.refresh(admin_user)
-            print("✅ Admin super créé")
-
-        # --- Création du sujet Administratif si nécessaire ---
-        admin_id = admin.id if admin else admin_user.id
-        admin_sujet = db.query(Sujet).filter(Sujet.titre == "Administratif").first()
-        if not admin_sujet:
-            admin_sujet = Sujet(
-                titre="Administratif",
-                idCreateur=admin_id,
-                province="admin"
-            )
-            db.add(admin_sujet)
-            db.commit()
-            db.refresh(admin_sujet)
-            print("✅ Sujet Administratif créé")
-        
-        yield
-
-    finally:
-        db.close()
-
-
-app = FastAPI(lifespan=lifespan)
-
-# --- CORS Middleware ---
-# --- CORS Middleware ---
-origins = [ 
+origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://ecat-taratra.vercel.app", # Retrait du slash final ici
+    "https://ecat-taratra.vercel.app",
 ]
 
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=origins, 
+    CORSMiddleware,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- Routes de test ---
-@app.get("/")
-def read_root():
-    return {"message": "Bienvenue sur Site-ECAT Backend"}
 
-@app.get("/test-db")
-def test_db():
+# ======================================================
+# STARTUP (REMPLACE LIFESPAN)
+# ======================================================
+
+@app.on_event("startup")
+async def startup():
+    # Création des tables
+    Base.metadata.create_all(bind=engine)
+
+    db: Session = SessionLocal()
     try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("SELECT 1;")
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
-        return {"message": "Connexion OK", "result": result}
-    except Exception as e:
-        return {"message": "Erreur", "details": str(e)}
+        # --------- ADMIN SUPER ---------
+        admin_email = "jeandedieuhasinirina82@gmail.com"
+        admin = db.query(User).filter(User.email == admin_email).first()
 
-# --- Inclusion des routers ---
+        if not admin:
+            admin_user = User(
+                nom="HASINIRINA",
+                prenom="Yannick",
+                email=admin_email,
+                mot_de_passe=hash_password("admin123"),
+                role="admin",
+                province="Fianarantsoa",
+                image=None,
+                statuts="Actif",
+                theme="light",
+            )
+            db.add(admin_user)
+            db.commit()
+            db.refresh(admin_user)
+            admin = admin_user
+            print("✅ Admin super créé")
+
+        # --------- SUJET ADMINISTRATIF ---------
+        sujet = db.query(Sujet).filter(Sujet.titre == "Administratif").first()
+        if not sujet:
+            sujet = Sujet(
+                titre="Administratif",
+                idCreateur=admin.id,
+                province="admin",
+            )
+            db.add(sujet)
+            db.commit()
+            print("✅ Sujet Administratif créé")
+
+    finally:
+        db.close()
+
+# ======================================================
+# ROUTES DE TEST
+# ======================================================
+
+@app.get("/")
+def root():
+    return {"message": "ECAT Backend opérationnel"}
+
+# ======================================================
+# ROUTERS
+# ======================================================
+
 app.include_router(auth.router)
 app.include_router(formation.router)
 app.include_router(paiement.router)
@@ -121,12 +124,13 @@ app.include_router(student.router)
 app.include_router(rapports.router)
 app.include_router(dashboard_router.router)
 
-# --- Pour servir les images uploadées ---
-required_dirs = ["upload", "uploads"]
+# ======================================================
+# STATIC FILES
+# ======================================================
 
-for directory in required_dirs:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-        print(f"✅ Dossier créé : {directory}")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+for folder in ["upload", "uploads"]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
 app.mount("/upload", StaticFiles(directory="upload"), name="upload")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
