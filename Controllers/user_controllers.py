@@ -1,18 +1,24 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from models.models import User, UserLivreAccess, Antenne
 from schemas.user_schemas import UserCreate,UserReadLocal,EtudiantOut
 from typing import List
 from fastapi import HTTPException,Depends
 import jwt
-import datetime
+from datetime import datetime, timezone, timedelta
 from Core.config import SECRET_KEY, ALGORITHM
 from Core.security import hash_password,verify_password
 from Core.database import get_db
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError 
+from jose import JWTError
 
 SECRET_KEY = "ECAT_SECRET_KEY_2025"
 ALGORITHM = "HS256"
+
+# Constants for repeated literals
+STATUS_EN_ATTENTE = "en attente"
+INVALID_CREDENTIALS_MSG = "Email ou mot de passe invalide"
+ROLE_ADMIN_LOCAL = "Admin Local"
 
 
 def create_user(db: Session, user: UserCreate):
@@ -28,11 +34,11 @@ def create_user(db: Session, user: UserCreate):
 
     role_lower = user.role.lower()
     if role_lower == "admin local":
-        statut_initial = "en attente"
+        statut_initial = STATUS_EN_ATTENTE
     elif role_lower in ["etudiante", "admin"]:
         statut_initial = "Actif"
     else:
-        statut_initial = "en attente"
+        statut_initial = STATUS_EN_ATTENTE
 
     db_user = User(
         nom=user.nom,
@@ -54,15 +60,15 @@ def authenticate_user_role(email: str, password: str, db: Session):
     user = db.query(User).filter(User.email == email).first()
 
     if not user:
-        return {"error": True, "message": "Email ou mot de passe invalide"}
+        return {"error": True, "message": INVALID_CREDENTIALS_MSG}
 
     try:
         password_ok = verify_password (password, user.mot_de_passe)
     except Exception:
-        return {"error": True, "message": "Email ou mot de passe invalide"}
+        return {"error": True, "message": INVALID_CREDENTIALS_MSG}
 
     if not password_ok:
-        return {"error": True, "message": "Email ou mot de passe invalide"}
+        return {"error": True, "message": INVALID_CREDENTIALS_MSG}
 
     #Protection spéciale : le super admin peut toujours se connecter
     if user.role.lower() == "admin":
@@ -70,11 +76,11 @@ def authenticate_user_role(email: str, password: str, db: Session):
     else:
         user_statut = getattr(user, "statuts", "").lower()
 
-        if user_statut == "en attente":
+        if user_statut == STATUS_EN_ATTENTE:
             return {
                 "error": True,
                 "message": "Votre compte est en attente de validation. Veuillez contacter l'administrateur.",
-                "statuts": "en attente"
+                "statuts": STATUS_EN_ATTENTE
             }
 
         if user_statut == "refuser" or user_statut == "refusé":
@@ -87,15 +93,10 @@ def authenticate_user_role(email: str, password: str, db: Session):
         if user_statut != "actif":
             return {
                 "error": True,
-                "message": f"Votre compte est en attente de validation. Contactez l'administrateur.",
+                "message": "Votre compte est en attente de validation. Contactez l'administrateur.",
                 "statuts": user.statuts
             }
         
-         # Durée plus longue pour le super-admin
-        if user.role.lower() == "admin":
-            expire_hours = 24  # ou 48h selon mon besoin
-        else:
-            expire_hours = 24   # durée normale pour autres utilisateurs
 
     #Génération du token JWT
     payload = {
@@ -103,7 +104,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
         "role": user.role,
         "nom": user.nom,
         "prenom": user.prenom,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=24),
     }
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -118,7 +119,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
 def get_all_admins_locaux(db: Session):
     admins = (
         db.query(User)
-        .filter(User.role == "Admin Local")
+        .filter(User.role == ROLE_ADMIN_LOCAL)
         .all()
     )
 
@@ -227,12 +228,12 @@ def create_user(db: Session, user: UserCreate):
     hashed_password = hash_password(user.mot_de_passe)
 
     # Déterminer le statut selon le rôle
-    if user.role.lower() == "Admin Local":
-        statut_initial = "en attente"
+    if user.role.lower() == ROLE_ADMIN_LOCAL.lower():
+        statut_initial = STATUS_EN_ATTENTE
     elif user.role.lower() in ["etudiante", "admin"]:
         statut_initial = "Actif"
     else:
-        statut_initial = "en attente"
+        statut_initial = STATUS_EN_ATTENTE
 
     db_user = User(
         nom=user.nom,
@@ -257,7 +258,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
 
     if not user:
         # Pas d'utilisateur → erreur classique
-        return {"error": True, "message": "Email ou mot de passe invalide"}
+        return {"error": True, "message": INVALID_CREDENTIALS_MSG}
 
     # Vérifier le mot de passe
     #pwd_bytes = password[:72].encode('utf-8')
@@ -266,15 +267,15 @@ def authenticate_user_role(email: str, password: str, db: Session):
         password_ok = verify_password(password, user.mot_de_passe)
     except Exception:
         # en cas d'erreur de vérification (ex: hash corrompu)
-        return {"error": True, "message": "Email ou mot de passe invalide"}
+        return {"error": True, "message": INVALID_CREDENTIALS_MSG}
 
     if not password_ok:
-        return {"error": True, "message": "Email ou mot de passe invalide"}
+        return {"error": True, "message": INVALID_CREDENTIALS_MSG}
 
-    # Vérifier le statut 
+    # Vérifier le statut
     user_statut = getattr(user, "statuts", None)  #  si colonne s'appelle différemment, renvoie None
-    if user_statut and user_statut.lower() == "en attente":
-        return {"error": True, "message": "Votre compte est en attente de validation. Veuillez contacter l'administrateur.", "statuts": "en attente"}
+    if user_statut and user_statut.lower() == STATUS_EN_ATTENTE:
+        return {"error": True, "message": "Votre compte est en attente de validation. Veuillez contacter l'administrateur.", "statuts": STATUS_EN_ATTENTE}
 
     if not user_statut or user_statut.lower() != "actif":
         # autre statut non autorisé
@@ -286,7 +287,7 @@ def authenticate_user_role(email: str, password: str, db: Session):
         "role": user.role,
         "nom": user.nom,
         "prenom": user.prenom,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=6),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=6),
     }
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -297,32 +298,6 @@ def authenticate_user_role(email: str, password: str, db: Session):
         "token": token
     }
 
-def create_pending_user(db: Session, user: UserCreate):
-    """
-    Crée un compte en attente de validation (Admin Local)
-    """
-    existing_pending = db.query(PendingUser).filter(PendingUser.email == user.email).first()
-    existing_user = db.query(User).filter(User.email == user.email).first()
-
-    if existing_user or existing_pending:
-        return {"error": "Cet e-mail est déjà utilisé."}
-
-   # pwd_bytes = user.mot_de_passe[:72].encode('utf-8')
-    hashed_password = hash_password(user.mot_de_passe)
-    pending_user = PendingUser(
-        nom=user.nom,
-        prenom=user.prenom,
-        email=user.email,
-        mot_de_passe=hashed_password,
-        province=user.province,
-        role=user.role,
-        statut="en attente"
-    )
-
-    db.add(pending_user)
-    db.commit()
-    db.refresh(pending_user)
-    return {"message": "Demande d’inscription en attente", "email": pending_user.email}
 
 def verify_user_password(db: Session, user_id: int, plain_password: str):
     user = db.query(User).filter(User.id == user_id).first()
@@ -342,7 +317,7 @@ def modif_password(user_id: int, mot_de_passe: str, db: Session):
     return {"success": True}
 
 def update_admin_status(db: Session, admin_id: int, new_status: str):
-    admin = db.query(User).filter(User.id == admin_id, User.role=="Admin Local").first()
+    admin = db.query(User).filter(User.id == admin_id, User.role==ROLE_ADMIN_LOCAL).first()
 
     if not admin:
         return None
@@ -409,12 +384,12 @@ def get_stats_by_antenne(db: Session):
             students_count = db.query(User).filter(User.role == "etudiante").filter(
                 or_(User.antenne_id == p["id"], User.province == prov_text)
             ).count()
-            admins_count = db.query(User).filter(User.role == "Admin Local").filter(
+            admins_count = db.query(User).filter(User.role == ROLE_ADMIN_LOCAL).filter(
                 or_(User.antenne_id == p["id"], User.province == prov_text)
             ).count()
         else:
             students_count = db.query(User).filter(User.role == "etudiante", User.province == prov_text).count()
-            admins_count = db.query(User).filter(User.role == "Admin Local", User.province == prov_text).count()
+            admins_count = db.query(User).filter(User.role == ROLE_ADMIN_LOCAL, User.province == prov_text).count()
 
         results.append({"antenne": prov_text, "students": students_count, "admins": admins_count})
 

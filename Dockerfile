@@ -13,6 +13,9 @@ WORKDIR /app
 
 COPY requirements.txt .
 
+# Mettre pip à jour pour Python 3.12
+RUN python -m pip install --upgrade pip
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
@@ -52,4 +55,4 @@ ENV DATABASE_URL=${DATABASE_URL} \
 
 EXPOSE 3148
 
-CMD uvicorn app.main:app --host 0.0.0.0 --port 3148
+CMD uvicorn main:app --host 0.0.0.0 --port 3148

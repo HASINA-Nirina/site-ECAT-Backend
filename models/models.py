@@ -6,7 +6,11 @@ from schemas.user_schemas import PaymentStatus
 from datetime import datetime, timedelta
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
-from Core.security import hash_password 
+from Core.security import hash_password
+
+# Constants for repeated literals
+CASCADE_ALL_DELETE_ORPHAN = "all, delete-orphan"
+USER_ID = "user.id"
 
 class User(Base):
     __tablename__ = "user"
@@ -26,7 +30,7 @@ class User(Base):
 
 
     # Ajouter la relation vers Notification
-    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan", foreign_keys="Notification.user_id")
+    notifications = relationship("Notification", back_populates="user", cascade=CASCADE_ALL_DELETE_ORPHAN, foreign_keys="Notification.user_id")
     paiements = relationship("Paiement", back_populates="utilisateur")
     antenne = relationship("Antenne", back_populates="users")
 
@@ -34,12 +38,12 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user.id"))  
+    user_id = Column(Integer, ForeignKey(USER_ID))
     message = Column(String, nullable=False)           # message obligatoire
     action_status = Column(String, default="non_lu")  # non_lu / accepte / refuse
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     type = Column(String, default="general")             # info / invitation
-    related_user_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    related_user_id = Column(Integer, ForeignKey(USER_ID), nullable=True)
     user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
 
 class Antenne(Base):
@@ -67,7 +71,7 @@ class Formation(Base):
     image = Column(String, nullable=True)
 
     # Relation vers les livres
-    livres = relationship("Livre", back_populates="formation", cascade="all, delete-orphan")
+    livres = relationship("Livre", back_populates="formation", cascade=CASCADE_ALL_DELETE_ORPHAN)
 
 
 class Livre(Base):
@@ -85,14 +89,14 @@ class Livre(Base):
     paiements = relationship(
     "Paiement",
     back_populates="livre",
-    cascade="all, delete-orphan"
+    cascade=CASCADE_ALL_DELETE_ORPHAN
 )
 
     # Accès utilisateur lié avec suppression en cascade
     user_access = relationship(
         "UserLivreAccess",
         back_populates="livre",
-        cascade="all, delete-orphan"
+        cascade=CASCADE_ALL_DELETE_ORPHAN
     )
 
 
@@ -103,7 +107,7 @@ class UserLivreAccess(Base):
     __tablename__ = "user_livre_access"
 
     id = Column(Integer, primary_key=True, index=True)
-    idUser = Column(Integer, ForeignKey("user.id"))
+    idUser = Column(Integer, ForeignKey(USER_ID))
     idLivre = Column(Integer, ForeignKey("livre.idLivre"))
     canAccess = Column(Boolean, default=True)
     livre = relationship("Livre", back_populates="user_access")
@@ -114,7 +118,7 @@ class Paiement(Base):
 
     idPaiement = Column(Integer, primary_key=True, index=True)
 
-    idUtilisateur = Column(Integer, ForeignKey("user.id"), nullable=False)
+    idUtilisateur = Column(Integer, ForeignKey(USER_ID), nullable=False)
     idLivre = Column(Integer, ForeignKey("livre.idLivre"), nullable=False)
     contact = Column(Integer, nullable=False)
     montant = Column(Float, nullable=False)
@@ -135,23 +139,23 @@ class Sujet(Base):
 
     idSujet = Column(Integer, primary_key=True, index=True)
     titre = Column(String, nullable=False)
-    idCreateur = Column(Integer, ForeignKey("user.id"), nullable=False)
+    idCreateur = Column(Integer, ForeignKey(USER_ID), nullable=False)
     date_creation = Column(DateTime, default=datetime.now(timezone.utc))
     image = Column(String, nullable=True)
     province = Column(String)  
 
     # Relation vers les messages (Ajout de la suppression en cascade)
     messages = relationship(
-        "Message", 
+        "Message",
         back_populates="sujet",
-        cascade="all, delete-orphan" # ACTIVER LA SUPPRESSION EN CASCADE
+        cascade=CASCADE_ALL_DELETE_ORPHAN # ACTIVER LA SUPPRESSION EN CASCADE
     )
 
 class Message(Base):
     __tablename__ = "message"
 
     idMessage = Column(Integer, primary_key=True, index=True)
-    idSender = Column(Integer, ForeignKey("user.id"), nullable=False)
+    idSender = Column(Integer, ForeignKey(USER_ID), nullable=False)
     # Clé étrangère vers Sujet avec suppression en cascade au niveau de la DB
     idSujet = Column(
         Integer, 
@@ -171,9 +175,9 @@ class Message(Base):
    
 class Historique(Base):
     __tablename__ = "historique"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    id_acteur = Column(Integer, ForeignKey("user.id"), nullable=False)
+    id_acteur = Column(Integer, ForeignKey(USER_ID), nullable=False)
     action_type = Column(String, nullable=False)  # Ex: 'CREATION_ANTENNE', 'MODIF_LIVRE', etc.
     description = Column(String, nullable=False)  # Description détaillée et lisible
     target_id = Column(Integer, nullable=True)  # ID de l'entité affectée (Antenne, Formation, etc.)

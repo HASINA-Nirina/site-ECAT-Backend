@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract
 from models.models import User, Paiement, Formation, Notification
 from schemas.user_schemas import PaymentStatus
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 from fastapi import HTTPException
 
@@ -48,7 +48,7 @@ def get_dashboard_stats(db: Session, current_user: User) -> Dict:
     # 4. Graphique Barre : Inscriptions par mois sur les 6 derniers mois
     # Utilisation des notifications de type "nouvelle_inscription" pour avoir les dates
     inscriptions_data = []
-    six_mois_avant = datetime.now() - timedelta(days=180)
+    six_mois_avant = func.now() - timedelta(days=180)
     
     # Récupérer toutes les notifications d'inscription pour cette province
     # Les notifications sont créées lors de l'inscription d'un étudiant
@@ -67,8 +67,9 @@ def get_dashboard_stats(db: Session, current_user: User) -> Dict:
     # Grouper par mois
     mois_counts = {}
     for notif in notifications_inscription:
-        mois_key = notif.created_at.strftime("%Y-%m")
-        mois_counts[mois_key] = mois_counts.get(mois_key, 0) + 1
+        if notif.created_at:
+            mois_key = notif.created_at.strftime("%Y-%m")
+            mois_counts[mois_key] = mois_counts.get(mois_key, 0) + 1
     
     # Construire les données pour les 6 derniers mois
     for i in range(5, -1, -1):  # 6 derniers mois (5, 4, 3, 2, 1, 0)

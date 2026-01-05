@@ -19,9 +19,8 @@ alembic==1.13.1
 
 # Sécurité (hashage des mots de passe)
 passlib[bcrypt]==1.7.4
+argon2-cffi==25.1.0
 
 # Variables d’environnement (.env)
 python-dotenv==1.0.1
 
-psycopg2-binary==2.9.9
-passlib[bcrypt]==1.7.4
