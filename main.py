@@ -2,7 +2,8 @@ import sys, os
 sys.path.append(os.path.dirname(__file__))
 
 from fastapi import FastAPI
-from routers import auth, formation, paiement, livre, forum, antenne, stats, student, rapports 
+from routers import auth, formation, paiement, livre, forum, antenne, stats, student, rapports
+from routers import dashboard_router 
 from Core.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -10,7 +11,9 @@ from Core.database import SessionLocal
 from models.models import User, Sujet
 from Core.security import hash_password
 from fastapi.staticfiles import StaticFiles
-
+import os
+# En production, vous définirez cette variable sur votre serveur
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 Base.metadata.create_all(bind=engine, checkfirst=True)
 
@@ -74,16 +77,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # --- CORS Middleware ---
-origins = [ "http://localhost:3000",
-    "http://127.0.0.1:3000",]
+# --- CORS Middleware ---
+origins = [ 
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://ecat-taratra.vercel.app", # Retrait du slash final ici
+]
+
 app.add_middleware(
     CORSMiddleware, 
-    allow_origins=origins,
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # --- Routes de test ---
 @app.get("/")
 def read_root():
@@ -112,7 +119,14 @@ app.include_router(antenne.router)
 app.include_router(stats.router)
 app.include_router(student.router)
 app.include_router(rapports.router)
+app.include_router(dashboard_router.router)
 
 # --- Pour servir les images uploadées ---
+required_dirs = ["upload", "uploads"]
+
+for directory in required_dirs:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"✅ Dossier créé : {directory}")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/upload", StaticFiles(directory="upload"), name="upload")

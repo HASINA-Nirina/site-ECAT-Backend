@@ -34,17 +34,24 @@ def get_current_user_from_request(request: Request, db: Session):
     return None
 
 @router.get("/ReadLivres/", response_model=list[LivreResponse])
-def read_livres(db: Session = Depends(get_db)):
-    return get_all_livres(db)
+def read_livres(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_from_request(request, db)
+    user_province = current_user.province if current_user else None
+    return get_all_livres(db, user_province)
 
 @router.get("/ReadLivres/{idFormation}/{idUser}")
-def read_livres_by_formation(idFormation: int, idUser: int, db: Session = Depends(get_db)):
-    return get_livres_by_formation(db, idFormation, idUser)
+def read_livres_by_formation(idFormation: int, idUser: int, request: Request, db: Session = Depends(get_db)):
+    # Récupérer la province de l'utilisateur connecté (pas celui passé en paramètre)
+    current_user = get_current_user_from_request(request, db)
+    user_province = current_user.province if current_user else None
+    return get_livres_by_formation(db, idFormation, idUser, user_province)
 
 
 @router.get("/ReadLivresLocal/{idFormation}")
-def read_livres_by_formation(idFormation: int, db: Session = Depends(get_db)):
-    return get_livres(db, idFormation)
+def read_livres_local(idFormation: int, request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user_from_request(request, db)
+    user_province = current_user.province if current_user else None
+    return get_livres(db, idFormation, user_province)
   
 @router.post("/NewLivre/")
 async def new_livre(
@@ -87,10 +94,13 @@ async def new_livre(
         
     )
 
-    db_livre = create_livre(db, livre, save_name, image_path)
+    # Récupérer l'utilisateur connecté pour sa province
+    current_user = get_current_user_from_request(request, db)
+    user_province = current_user.province if current_user else None
+    
+    db_livre = create_livre(db, livre, save_name, image_path, user_province)
     
     # Enregistrer l'historique
-    current_user = get_current_user_from_request(request, db)
     print(current_user)
     if current_user:
         try:

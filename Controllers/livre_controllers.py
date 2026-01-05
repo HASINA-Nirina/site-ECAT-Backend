@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import UploadFile, HTTPException
-from models.models import Livre,UserLivreAccess,Paiement
+from models.models import Livre, UserLivreAccess, Paiement, User
 from schemas.user_schemas import LivreCreate, LivreUpdate, LivreDebloque, PaymentStatus
 from sqlalchemy.orm import Session
 import shutil
@@ -12,14 +12,25 @@ UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-def get_all_livres(db: Session):
-    Livre = db.query(Livre).all()
+def get_all_livres(db: Session, user_province: str = None):
+    """
+    Récupère tous les livres, filtrés par province si user_province est fourni.
+    """
+    query = db.query(Livre)
+    if user_province:
+        query = query.filter(Livre.province == user_province)
+    return query.all()
     
 
 
-def get_livres_by_formation(db: Session, idFormation: int, idUser: int):
-    # Sélectionner tous les livres appartenant à une formation
-    livres = db.query(Livre).filter(Livre.idFormation == idFormation).all()
+def get_livres_by_formation(db: Session, idFormation: int, idUser: int, user_province: str = None):
+    """
+    Sélectionne tous les livres appartenant à une formation, filtrés par province.
+    """
+    query = db.query(Livre).filter(Livre.idFormation == idFormation)
+    if user_province:
+        query = query.filter(Livre.province == user_province)
+    livres = query.all()
     result = []
 
     for livre in livres:
@@ -39,9 +50,14 @@ def get_livres_by_formation(db: Session, idFormation: int, idUser: int):
 
     return result
 
-def get_livres(db: Session, idFormation: int):
-    # Sélectionner tous les livres appartenant à une formation
-    livres = db.query(Livre).filter(Livre.idFormation == idFormation).all()
+def get_livres(db: Session, idFormation: int, user_province: str = None):
+    """
+    Sélectionne tous les livres appartenant à une formation, filtrés par province.
+    """
+    query = db.query(Livre).filter(Livre.idFormation == idFormation)
+    if user_province:
+        query = query.filter(Livre.province == user_province)
+    livres = query.all()
     result = []
 
     for livre in livres:
@@ -60,13 +76,24 @@ def get_livres(db: Session, idFormation: int):
     return result
 
 def get_livre_debloque_by_idetudiant(db: Session, iduser: int):
+    """
+    Récupère les livres débloqués par un étudiant, filtrés par sa province.
+    """
+    # Récupérer la province de l'utilisateur
+    user = db.query(User).filter(User.id == iduser).first()
+    user_province = user.province if user else None
     
-    livres = (
+    query = (
         db.query(Livre)
         .join(UserLivreAccess, Livre.idLivre == UserLivreAccess.idLivre)
         .filter(UserLivreAccess.idUser == iduser)
-        .all()
     )
+    
+    # Filtrer par province si l'utilisateur a une province
+    if user_province:
+        query = query.filter(Livre.province == user_province)
+    
+    livres = query.all()
     print(len(livres))
     return [
         {
@@ -83,7 +110,10 @@ def get_livre_debloque_by_idetudiant(db: Session, iduser: int):
 
 
 
-def create_livre(db: Session, livre: LivreCreate, pdf_path: str , image_path: str ):
+def create_livre(db: Session, livre: LivreCreate, pdf_path: str, image_path: str, user_province: str = None):
+    """
+    Crée un nouveau livre avec la province de l'utilisateur connecté.
+    """
     db_livre = Livre(
         idFormation=livre.idFormation,
         titre=livre.titre,
@@ -91,7 +121,8 @@ def create_livre(db: Session, livre: LivreCreate, pdf_path: str , image_path: st
         urlPdf=pdf_path,
         image=image_path,
         description=livre.description,
-        prix=livre.prix
+        prix=livre.prix,
+        province=user_province
     )
     db.add(db_livre)
     db.commit()
