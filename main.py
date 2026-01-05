@@ -118,11 +118,11 @@ app.include_router(rapports.router)
 app.include_router(dashboard_router.router)
 
 # --- Pour servir les images uploadées ---
-UPLOAD_DIR = "upload"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+required_dirs = ["upload", "uploads"]
+
+for directory in required_dirs:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"✅ Dossier créé : {directory}")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/upload", StaticFiles(directory="upload"), name="upload")
