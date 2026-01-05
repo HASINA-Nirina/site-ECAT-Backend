@@ -247,46 +247,50 @@ def create_province_forum(user_id: int, province_name: str, db_session_factory):
     finally:
         db.close()
 
+@router.options("/login")
+def options_login():
+    return Response(status_code=200)
+
+
 @router.post("/login")
 def login(
-    credentials: UserLogin, 
-    response: Response, 
-    background_tasks: BackgroundTasks, 
-    db: Session = Depends(get_db)
+    credentials: UserLogin,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
 ):
     result = authenticate_user_role(credentials.email, credentials.mot_de_passe, db)
 
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=400, detail=result.get("message"))
-    
+
     user = db.query(User).filter(User.email == credentials.email).first()
     if not user:
-         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
-    # On sauvegarde les infos nécessaires avant tout commit
-    user_province = user.province
-    user_id = user.id
-
-    # ⚡ On délègue la création du forum à une tâche de fond
-    if result["role"] == "Admin Local" and user_province:
-        # On passe get_db (la factory) pour créer une nouvelle session propre en tâche de fond
-        background_tasks.add_task(create_province_forum, user_id, user_province, get_db)
+    if result["role"] == "Admin Local" and user.province:
+        background_tasks.add_task(
+            create_province_forum,
+            user.id,
+            user.province,
+            get_db,
+        )
 
     response.set_cookie(
         key="token",
         value=result["token"],
         httponly=True,
-        samesite="lax",
-        secure=True  # Mettre à True en HTTPS (Production)
+        secure=True,
+        samesite="none",  # ⭐ FIX MAJEUR
     )
 
     return {
         "error": False,
-        "token": result["token"],
         "role": result["role"],
-        "province": user_province,
-        "message": "Connexion réussie"
+        "province": user.province,
+        "message": "Connexion réussie",
     }
+
 
 @router.get("/me")
 def get_current_user(request: Request, db: Session = Depends(get_db)):
