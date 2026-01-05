@@ -78,7 +78,7 @@ app = FastAPI(lifespan=lifespan)
 
 # --- CORS Middleware ---
 origins = [ "http://localhost:3000",
-    "http://127.0.0.1:3000",https://ecat-taratra.vercel.app/,]
+    "http://127.0.0.1:3000","https://ecat-taratra.vercel.app/",]
 app.add_middleware(
     CORSMiddleware, 
     allow_origins=origins,
