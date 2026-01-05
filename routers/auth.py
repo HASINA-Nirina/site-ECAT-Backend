@@ -249,49 +249,55 @@ def create_province_forum(user_id: int, province_name: str, db_session_factory):
 
 @router.options("/login")
 def options_login():
-    return Response(status_code=200)
-
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "https://ecat-taratra.vercel.app",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
 
 @router.post("/login")
 def login(
-    credentials: UserLogin,
-    response: Response,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
+    credentials: UserLogin, 
+    response: Response, 
+    background_tasks: BackgroundTasks, 
+    db: Session = Depends(get_db)
 ):
     result = authenticate_user_role(credentials.email, credentials.mot_de_passe, db)
 
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=400, detail=result.get("message"))
-
+    
     user = db.query(User).filter(User.email == credentials.email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
-    if result["role"] == "Admin Local" and user.province:
-        background_tasks.add_task(
-            create_province_forum,
-            user.id,
-            user.province,
-            get_db,
-        )
+    user_province = user.province
+    user_id = user.id
 
+    if result["role"] == "Admin Local" and user_province:
+        background_tasks.add_task(create_province_forum, user_id, user_province, get_db)
+
+    # ✅ ÉTAPE 2 : Configuration du Cookie pour Vercel <-> Render
     response.set_cookie(
         key="token",
         value=result["token"],
         httponly=True,
-        secure=True,
-        samesite="none",  # ⭐ FIX MAJEUR
+        secure=True,          # Obligatoire pour SameSite="none"
+        samesite="none",      # ⭐ CRITIQUE : Autorise le cookie entre domaines différents
+        max_age=3600 * 24     # Expire après 24h (optionnel mais conseillé)
     )
 
     return {
         "error": False,
+        "token": result["token"],
         "role": result["role"],
-        "province": user.province,
-        "message": "Connexion réussie",
+        "province": user_province,
+        "message": "Connexion réussie"
     }
-
-
 @router.get("/me")
 def get_current_user(request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get("token")
