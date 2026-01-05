@@ -77,16 +77,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # --- CORS Middleware ---
-origins = [ "http://localhost:3000",
-    "http://127.0.0.1:3000","https://ecat-taratra.vercel.app/",]
+# --- CORS Middleware ---
+origins = [ 
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://ecat-taratra.vercel.app", # Retrait du slash final ici
+]
+
 app.add_middleware(
     CORSMiddleware, 
-    allow_origins=origins,
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # --- Routes de test ---
 @app.get("/")
 def read_root():
