@@ -121,7 +121,7 @@ class Paiement(Base):
 
     idUtilisateur = Column(Integer, ForeignKey(USER_ID), nullable=False)
     idLivre = Column(Integer, ForeignKey("livre.idLivre"), nullable=False)
-    contact = Column(Integer, nullable=False)
+    contact = Column(String(50))
     montant = Column(Float, nullable=False)
     operateur = Column(String, nullable=False)
     reference = Column(String, nullable=False, unique=True)
