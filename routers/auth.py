@@ -631,7 +631,7 @@ async def send_otp(data: EmailRequest, db: Session = Depends(get_db)):
 
 @router.post("/auth/verify")
 def verify_otp(
-    data: VerifyOtpRequest,
+    data: VerifyOTPRequest,
     db: Session = Depends(get_db)
 ):
     otp = db.query(OTP).filter(
