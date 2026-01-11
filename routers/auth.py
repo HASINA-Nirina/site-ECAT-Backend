@@ -454,7 +454,12 @@ def get_notifications(request: Request, db: Session = Depends(get_db)):
 
     
 @router.post("/notifications/{notif_id}/accepter")
-def accepter_invitation(notif_id: int, db: Session = Depends(get_db), request: Request = None):
+def accepter_invitation(
+    notif_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    # 🔐 Récupération du token
     token = request.cookies.get("token")
     if not token:
         raise HTTPException(status_code=401, detail="Token manquant")
@@ -462,43 +467,54 @@ def accepter_invitation(notif_id: int, db: Session = Depends(get_db), request: R
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         super_admin_email = payload.get("sub")
-    except jwt.PyJWTError:
+        if not super_admin_email:
+            raise HTTPException(status_code=401, detail="Token invalide")
+    except JWTError:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-    # Vérifier que l'utilisateur est bien un super-admin
-    super_admin = db.query(User).filter(User.email == super_admin_email, User.role=="admin").first()
+    # 🔎 Vérifier super-admin
+    super_admin = (
+        db.query(User)
+        .filter(User.email == super_admin_email, User.role == "admin")
+        .first()
+    )
     if not super_admin:
         raise HTTPException(status_code=403, detail="Accès refusé")
 
-    # Récupérer la notification
+    # 🔔 Récupérer notification
     notif = db.query(Notification).filter(Notification.id == notif_id).first()
     if not notif:
         raise HTTPException(status_code=404, detail="Notification introuvable")
 
-    # ⚡ Mettre à jour la notification
+    # ✅ Mise à jour notification
     notif.action_status = "accepte"
 
-    # ⚡ Activer le compte admin local correspondant
+    # 👤 Activation admin local
     admin_local = db.query(User).filter(User.id == notif.related_user_id).first()
-    if admin_local:
-        admin_local.statuts = "Actif"
-        db.commit()
-        
-        # Enregistrer l'historique
-        try:
-            create_historique_for_super_admin(
-                db=db,
-                id_acteur=super_admin.id,
-                action_type="ADMIN_ACCEPT",
-                description=f"L'Admin Super {super_admin.prenom} {super_admin.nom} a accepté l'utilisateur {admin_local.prenom} {admin_local.nom} comme Admin Local.",
-                target_id=admin_local.id
-            )
-        except Exception as e:
-            # Ne pas faire échouer la requête si l'historique échoue
-            print(f"Erreur lors de l'enregistrement de l'historique: {e}")
-    else:
-        db.commit()
-    
+    if not admin_local:
+        raise HTTPException(status_code=404, detail="Utilisateur lié introuvable")
+
+    admin_local.statuts = "Actif"
+
+    # 💾 Commit principal
+    db.commit()
+
+    # 📝 Historique (non bloquant)
+    try:
+        create_historique_for_super_admin(
+            db=db,
+            id_acteur=super_admin.id,
+            action_type="ADMIN_ACCEPT",
+            description=(
+                f"L'Admin Super {super_admin.prenom} {super_admin.nom} "
+                f"a accepté l'utilisateur {admin_local.prenom} {admin_local.nom} "
+                "comme Admin Local."
+            ),
+            target_id=admin_local.id
+        )
+    except Exception as e:
+        print(f"Erreur historique: {e}")
+
     return {"message": "Invitation acceptée et compte activé."}
 
 
