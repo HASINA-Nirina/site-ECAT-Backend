@@ -131,8 +131,12 @@ async def send_email_api(to_email: str, subject: str, html: str):
             json=payload
         )
 
+       print("STATUS:", response.status_code)
+        print("BODY:", response.text)
+
         if response.status_code not in (200, 201):
-            raise Exception(response.text)
+            raise Exception(f"Resend error {response.status_code}: {response.text}")
+
 
 
 async def sendotp(email: str, db: Session):
