@@ -11,7 +11,7 @@ from models.models import OTP
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import random
-
+import socket
 conf = settings.MAIL_CONFIG
 
 
