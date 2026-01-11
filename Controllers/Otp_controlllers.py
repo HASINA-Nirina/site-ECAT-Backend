@@ -106,3 +106,99 @@ def verify_otp(email: str, code: str, db: Session):
     db.delete(otp)
     db.commit()
     return {"success": True, "message": "Code correct"}
+RESEND_API_KEY = "re_TvaAG8PJ_6ETkjH31NkNZn2hC5GkcYkfC"
+
+RESEND_URL = "https://api.resend.com/emails"
+RESEND_FROM = "onboarding@resend.dev"  # fourni par Resend, déjà vérifié
+
+async def send_email_api(to_email: str, subject: str, html: str):
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "from": RESEND_FROM,
+        "to": [to_email],
+        "subject": subject,
+        "html": html
+    }
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.post(
+            RESEND_URL,
+            headers=headers,
+            json=payload
+        )
+
+        if response.status_code not in (200, 201):
+            raise Exception(response.text)
+
+
+async def sendotp(email: str, db: Session):
+    try:
+        # Supprimer anciens OTP (bonne pratique)
+        db.query(OTP).filter(OTP.email == email).delete()
+
+        # Génération OTP
+        code = str(random.randint(100000, 999999))
+        expires_at = datetime.now() + timedelta(minutes=5)
+
+        otp = OTP(email=email, code=code, expires_at=expires_at)
+        db.add(otp)
+        db.commit()
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
+          <div style="max-width: 480px; margin: auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden;">
+            
+            <!-- Bandeau avec logo -->
+            <div style="background-color: #f9f9f9; padding: 20px; text-align: center;">
+              <img src="https://raw.githubusercontent.com/HASINA-Nirina/site-ECAT-Frontend/main/src/app/assets/logo.jpeg" alt="Logo Université ECAT" style="width: 80px; height: 80px; border-radius: 50%;">
+            </div>
+
+            <!-- Titre principal -->
+            <div style="padding: 20px; text-align: center; border-top: 5px solid #1177ff;">
+              <h2 style="color: #111; margin-bottom: 8px;">Authentification</h2>
+              <p style="color: #444; font-size: 14px;">Voici le code de vérification que vous avez demandé pour confirmer votre identité :</p>
+
+              <!-- Code OTP -->
+              <div style="margin: 20px auto; font-size: 28px; font-weight: bold; color: #1177ff; letter-spacing: 4px; background-color: #f0f7ff; display: inline-block; padding: 10px 20px; border-radius: 8px;">
+                {code}
+              </div>
+
+              <p style="font-size: 13px; color: #555; margin-top: 16px;">
+                Ce code expirera dans <strong>5 minutes</strong>. Ne le partagez avec personne pour des raisons de sécurité.
+              </p>
+
+              <p style="font-size: 13px; color: #777; margin-top: 10px;">
+                Si vous n’êtes pas à l’origine de cette demande, ignorez simplement cet e-mail.
+              </p>
+            </div>
+
+            <!-- Pied de page coloré -->
+            <div style="background-color: #1177ff; height: 10px;"></div>
+          </div>
+
+          <!-- Signature -->
+          <p style="text-align: center; font-size: 12px; color: #666; margin-top: 16px;">
+            © 2025 Université ECAT Taratra Fianarantsoa
+          </p>
+        </div>
+        """
+
+
+        # Envoi via Resend
+        await send_email_api(
+            to_email=email,
+            subject="Votre code de vérification ECAT",
+            html=html_content
+        )
+
+        return True
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur envoi email : {str(e)}"
+        )
