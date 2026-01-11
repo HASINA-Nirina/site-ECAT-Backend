@@ -31,7 +31,7 @@ from dependencies import get_current_user
 from schemas.user_schemas import Province,AdminUpdateStatus, UserCreate,EtudiantOut, UserResponse,UserLogin,EmailRequest,VerifyOTPRequest,ChangePassword,EtudiantResponse,UserReadLocal,UserUpdate,PasswordVerify,UserLivreAccessCheck
 from models.models import User,Sujet
 from Controllers.user_controllers import get_etudiants, get_all_admins_locaux,update_admin_status, get_etudiants_by_province,get_current_user,create_user, get_user_by_email,authenticate_user_role, modif_password ,get_all_etudiant ,update_user,verify_user_password
-from Controllers.Otp_controlllers import sendOtp,verify_otp
+from Controllers.Otp_controlllers import sendOtp,verify_otp,sendotp
 from Core.security import hash_password
 from jwt.exceptions import ExpiredSignatureError
 from typing import List
@@ -603,7 +603,7 @@ def read_etudiant(db: Session = Depends(get_db)):
 
 
 ############OTP################
-@router.post("/sendOtp")
+@router.post("/sendotp")
 async def send_otp(data: EmailRequest, db: Session = Depends(get_db)):
     print(f"Tentative d'envoi OTP pour : {data.email}") 
     
@@ -619,6 +619,15 @@ async def send_otp(data: EmailRequest, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"ERREUR ENVOI EMAIL : {e}") # C'est ici que vous verrez le vrai problème
         return {"error": "Échec de l'envoi de l'e-mail", "details": str(e)}
+@router.post("/sendOtp")
+async def send_otp(data: EmailRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email.ilike(data.email)).first()
+
+    if not user:
+        return {"error": "Cet e-mail n'existe pas"}
+
+    await sendotp(data.email, db)
+    return {"message": "OTP envoyé avec succès"}
 
 @router.post("/verify")
 def check_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)):
