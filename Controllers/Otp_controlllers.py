@@ -106,8 +106,8 @@ def verify_otp(email: str, code: str, db: Session):
     db.delete(otp)
     db.commit()
     return {"success": True, "message": "Code correct"}
-RESEND_API_KEY = "re_TvaAG8PJ_6ETkjH31NkNZn2hC5GkcYkfC"
 
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 RESEND_URL = "https://api.resend.com/emails"
 RESEND_FROM = "onboarding@resend.dev"  # fourni par Resend, déjà vérifié
 
