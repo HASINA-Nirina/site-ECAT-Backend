@@ -119,24 +119,27 @@ async def send_email_api(to_email: str, subject: str, html: str):
     }
 
     payload = {
-        "from": RESEND_FROM,
+        "from": "onboarding@resend.dev",
         "to": [to_email],
         "subject": subject,
         "html": html
     }
 
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=20) as client:
         response = await client.post(
-            RESEND_URL,
+            "https://api.resend.com/emails",
             headers=headers,
             json=payload
         )
 
-        print("STATUS:", response.status_code)
-        print("BODY:", response.text)
+        # 🔴 LOGS CRITIQUES
+        print("RESEND STATUS =", response.status_code)
+        print("RESEND BODY =", response.text)
 
         if response.status_code not in (200, 201):
-            raise Exception(f"Resend error {response.status_code}: {response.text}")
+            raise RuntimeError(
+                f"RESEND ERROR {response.status_code}: {response.text}"
+            )
 
 
 
