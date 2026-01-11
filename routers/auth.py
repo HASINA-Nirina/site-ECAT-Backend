@@ -606,16 +606,21 @@ def read_etudiant(db: Session = Depends(get_db)):
 
 ############OTP################
 @router.post("/sendOtp")
-async def send_otp(data: EmailRequest , db: Session = Depends(get_db)):
-    print(" Données reçues :", data)
-    existing_user = db.query(User).filter(User.email == data.email).first()
+async def send_otp(data: EmailRequest, db: Session = Depends(get_db)):
+    print(f"Tentative d'envoi OTP pour : {data.email}") 
+    
+    existing_user = db.query(User).filter(User.email.ilike(data.email)).first()
 
-    if existing_user:
+    if not existing_user:
+        print("Erreur : l'email n'existe pas en base")
+        return {"error": "Cet e-mail n'existe pas"}
+
+    try:
         await sendOtp(data.email, db)
         return {"message": "otp envoyer"}
-
-    print("email n existe pas ")
-    return {"error":"Cet e-mail email n existe pas"}
+    except Exception as e:
+        print(f"ERREUR ENVOI EMAIL : {e}") # C'est ici que vous verrez le vrai problème
+        return {"error": "Échec de l'envoi de l'e-mail", "details": str(e)}
 
 @router.post("/verify")
 def check_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)):
