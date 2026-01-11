@@ -278,9 +278,7 @@ def login(
     user_province = user.province
     user_id = user.id
 
-    if result["role"] == "Admin Local" and user_province:
-        background_tasks.add_task(create_province_forum, user_id, user_province, get_db)
-
+    
     # ✅ ÉTAPE 2 : Configuration du Cookie pour Vercel <-> Render
     response.set_cookie(
         key="token",
