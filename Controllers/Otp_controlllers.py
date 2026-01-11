@@ -14,8 +14,10 @@ import random
 
 conf = settings.MAIL_CONFIG
 
+
 async def sendOtp(email: str, db: Session):
     try:
+        # 1. Génération et Sauvegarde
         code = str(random.randint(100000, 999999))
         expires_at = datetime.now() + timedelta(minutes=5)
 
@@ -63,23 +65,29 @@ async def sendOtp(email: str, db: Session):
         </div>
         """
 
+        # 3. Configuration du message
         message = MessageSchema(
             subject="Votre code de vérification ECAT",
             recipients=[email],
             body=html_content,
-            subtype="html",  # ✅ important pour que le design HTML fonctionne
+            subtype=MessageType.html # Utilisez l'énumération MessageType pour plus de sécurité
         )
 
-        fm = FastMail(conf)
+        # 4. Envoi via FastMail en utilisant vos paramètres centralisés
+        fm = FastMail(settings.MAIL_CONFIG)
         await fm.send_message(message)
 
-        return {"message": "OTP envoyé avec succès"}
+        print(f"✅ OTP envoyé avec succès à {email}")
+        return True # On retourne un booléen simple pour la logique interne
 
     except Exception as e:
-        print("Erreur d’envoi OTP :", repr(e))
-        return {"detail": "Erreur d’envoi d’e-mail"}
-
-
+        db.rollback() # Annule l'insertion de l'OTP en base si le mail échoue
+        print(f"❌ ERREUR CRITIQUE SMTP : {repr(e)}")
+        # On lève une VRAIE erreur HTTP pour que le frontend passe dans le bloc catch
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Erreur serveur d'envoi d'e-mail : {str(e)}"
+        )
 def verify_otp(email: str, code: str, db: Session):
     otp = db.query(OTP).filter(OTP.email == email, OTP.code == code).first()
     
