@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 import random
 import socket
 import os
+import httpx
+
 conf = settings.MAIL_CONFIG
 print("RESEND_API_KEY =", os.getenv("RESEND_API_KEY"))
 
