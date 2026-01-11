@@ -145,21 +145,24 @@ async def send_email_api(to_email: str, subject: str, html: str):
 
 async def sendotp(email: str, db: Session):
     try:
-        print("RESEND_API_KEY =", os.getenv("RESEND_API_KEY"))
-        
-        if not RESEND_API_KEY:
-            raise RuntimeError("❌ RESEND_API_KEY ABSENTE SUR RENDER")
-        # Supprimer anciens OTP (bonne pratique)
+        print("➡️ Début sendotp")
+
+        # Test DB
+        print("➡️ Suppression anciens OTP")
         db.query(OTP).filter(OTP.email == email).delete()
 
-        # Génération OTP
+        print("➡️ Génération OTP")
         code = str(random.randint(100000, 999999))
         expires_at = datetime.now() + timedelta(minutes=5)
 
         otp = OTP(email=email, code=code, expires_at=expires_at)
+
+        print("➡️ Ajout OTP")
         db.add(otp)
+
+        print("➡️ Commit DB")
         db.commit()
-        html_content = f"""
+                html_content = f"""
         <div style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
           <div style="max-width: 480px; margin: auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden;">
             
@@ -198,19 +201,17 @@ async def sendotp(email: str, db: Session):
         </div>
         """
 
-
-        # Envoi via Resend
+        print("➡️ Envoi email Resend")
         await send_email_api(
             to_email=email,
-            subject=" code de vérification ECAT",
+            subject="Votre code de vérification ECAT",
             html=html_content
         )
 
+        print("✅ Fin sendotp")
         return True
 
     except Exception as e:
+        print("❌ ERREUR DANS SENDOTP =", repr(e))
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur envoi email : {str(e)}"
-        )
+        raise
