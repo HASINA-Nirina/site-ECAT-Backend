@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     email_password: str
 
     MAIL_FROM_NAME: str = "ECAT Support"
-    MAIL_PORT: int = 587
+    MAIL_PORT: int = 465
     MAIL_SERVER: str = "smtp.gmail.com"
 
     @property
@@ -22,13 +22,17 @@ class Settings(BaseSettings):
             MAIL_USERNAME=self.email_sender,
             MAIL_PASSWORD=self.email_password,
             MAIL_FROM=self.email_sender,
-            MAIL_PORT=self.MAIL_PORT,
-            MAIL_SERVER=self.MAIL_SERVER,
+            MAIL_PORT=465,
+            MAIL_SERVER="smtp.gmail.com",
             MAIL_FROM_NAME=self.MAIL_FROM_NAME,
-            MAIL_STARTTLS=True,
-            MAIL_SSL_TLS=False,
+            MAIL_STARTTLS=False,
+            MAIL_SSL_TLS=True,
             USE_CREDENTIALS=True,
             VALIDATE_CERTS=True
+
+            
+            
+    )
         )
 
 settings = Settings()
