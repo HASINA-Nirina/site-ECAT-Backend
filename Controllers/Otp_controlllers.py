@@ -162,7 +162,7 @@ async def sendotp(email: str, db: Session):
 
         print("➡️ Commit DB")
         db.commit()
-                html_content = f"""
+        html_content = f"""
         <div style="font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;">
           <div style="max-width: 480px; margin: auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden;">
             
