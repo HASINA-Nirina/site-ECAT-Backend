@@ -142,6 +142,7 @@ async def send_email_api(to_email: str, subject: str, html: str):
 
 async def sendotp(email: str, db: Session):
     try:
+        print("RESEND_API_KEY =", os.getenv("RESEND_API_KEY"))
         # Supprimer anciens OTP (bonne pratique)
         db.query(OTP).filter(OTP.email == email).delete()
 
@@ -195,7 +196,7 @@ async def sendotp(email: str, db: Session):
         # Envoi via Resend
         await send_email_api(
             to_email=email,
-            subject="Votre code de vérification ECAT",
+            subject=" code de vérification ECAT",
             html=html_content
         )
 
