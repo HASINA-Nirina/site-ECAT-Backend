@@ -131,7 +131,7 @@ async def send_email_api(to_email: str, subject: str, html: str):
             json=payload
         )
 
-       print("STATUS:", response.status_code)
+        print("STATUS:", response.status_code)
         print("BODY:", response.text)
 
         if response.status_code not in (200, 201):
