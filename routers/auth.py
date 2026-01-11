@@ -629,9 +629,26 @@ async def send_otp(data: EmailRequest, db: Session = Depends(get_db)):
     await sendotp(data.email, db)
     return {"message": "OTP envoyé avec succès"}
 
-@router.post("/verify")
-def check_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)):
-    return  verify_otp(data.email, data.code, db)
+@router.post("/auth/verify")
+def verify_otp(
+    data: VerifyOtpRequest,
+    db: Session = Depends(get_db)
+):
+    otp = db.query(OTP).filter(
+        OTP.email == data.email,
+        OTP.code == data.code
+    ).first()
+
+    if not otp:
+        return {"success": False, "message": "Code invalide"}
+
+    if datetime.now() > otp.expires_at:
+        return {"success": False, "message": "Code expiré"}
+
+    db.delete(otp)
+    db.commit()
+
+    return {"success": True, "message": "Code correct"}
 
 @router.get("/ReadUser")
 def read_user(email: str, db: Session = Depends(get_db)):
