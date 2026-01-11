@@ -143,6 +143,9 @@ async def send_email_api(to_email: str, subject: str, html: str):
 async def sendotp(email: str, db: Session):
     try:
         print("RESEND_API_KEY =", os.getenv("RESEND_API_KEY"))
+        
+        if not RESEND_API_KEY:
+            raise RuntimeError("❌ RESEND_API_KEY ABSENTE SUR RENDER")
         # Supprimer anciens OTP (bonne pratique)
         db.query(OTP).filter(OTP.email == email).delete()
 
