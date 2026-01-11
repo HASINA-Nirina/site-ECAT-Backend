@@ -42,4 +42,7 @@ python-dotenv==1.1.1
 
 # Utilitaires supplémentaires (si nécessaires)
 python-multipart==0.0.9  # Pour les uploads de fichiers (Form, File)
+httpx>=0.27.0
+
+
 
