@@ -629,7 +629,7 @@ async def send_otp(data: EmailRequest, db: Session = Depends(get_db)):
     await sendotp(data.email, db)
     return {"message": "OTP envoyé avec succès"}
 
-@router.post("/auth/verify")
+@router.post("/verify")
 def verify_otp(
     data: VerifyOTPRequest,
     db: Session = Depends(get_db)
