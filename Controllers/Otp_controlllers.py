@@ -17,6 +17,12 @@ conf = settings.MAIL_CONFIG
 
 async def sendOtp(email: str, db: Session):
     try:
+        # On teste si le port 465 de Google est joignable
+        socket.create_connection(("smtp.gmail.com", 465), timeout=5)
+        print("✅ Connexion réseau au port 465 réussie")
+    except Exception as e:
+        print(f"❌ Le réseau bloque l'accès au port 465 : {e}")
+    try:
         # 1. Génération et Sauvegarde
         code = str(random.randint(100000, 999999))
         expires_at = datetime.now() + timedelta(minutes=5)
