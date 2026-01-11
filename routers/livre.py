@@ -181,9 +181,13 @@ async def delete_livre(request: Request, livre_id: int, db: Session = Depends(ge
 
 
 @router.post("/Debloque")
-def new_access(data:LivreDebloque ,db: Session = Depends(get_db)):
-    access= debloque_livre(db, data)
-    return access
+def new_access(data: LivreDebloque, db: Session = Depends(get_db)):
+    try:
+        access = debloque_livre(db, data)
+        return access
+    except Exception as e:
+        print(f"Erreur détectée : {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/livreDebloqueEtudiant/{iduser}")
 def lire_livres_debloque(iduser: int, db: Session = Depends(get_db)):
