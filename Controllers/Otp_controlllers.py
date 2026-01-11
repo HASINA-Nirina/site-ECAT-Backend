@@ -5,7 +5,7 @@ from Core.config import settings
 import random, smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
-from fastapi_mail import FastMail, MessageSchema
+from fastapi_mail import FastMail, MessageSchema, MessageType
 from Core.config import settings
 from models.models import OTP
 from sqlalchemy.orm import Session
