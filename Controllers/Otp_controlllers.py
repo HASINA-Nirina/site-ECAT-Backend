@@ -14,7 +14,7 @@ import random
 import socket
 import os
 conf = settings.MAIL_CONFIG
-
+print("RESEND_API_KEY =", os.getenv("RESEND_API_KEY"))
 
 async def sendOtp(email: str, db: Session):
     try:
